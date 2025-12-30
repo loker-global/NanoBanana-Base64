@@ -657,6 +657,48 @@ body {
     flex-direction: column;
 }
 
+.api-key-container {
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+}
+
+.api-key-input {
+    flex: 1;
+}
+
+.btn-validate {
+    padding: 14px 24px;
+    border-radius: var(--border-radius-sm);
+    background: linear-gradient(135deg, var(--success-color), #45a049);
+    border: none;
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-speed);
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-validate:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
+    background: linear-gradient(135deg, #45a049, var(--success-color));
+}
+
+.btn-validate:active {
+    transform: translateY(0);
+}
+
+.btn-validate:disabled {
+    background: rgba(255, 255, 255, 0.2);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
 .api-input-group label {
     font-size: 1rem;
     font-weight: 600;
@@ -895,6 +937,87 @@ body {
     line-height: 1.6;
     white-space: pre-wrap;
     word-wrap: break-word;
+}
+
+/* ===================================
+   JSON Result Styles
+   =================================== */
+.json-result-container {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 107, 157, 0.1));
+    border: 2px solid rgba(255, 215, 0, 0.3);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-lg);
+    margin-bottom: var(--spacing-md);
+}
+
+.json-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+}
+
+.json-stat {
+    background: rgba(255, 215, 0, 0.2);
+    color: var(--primary-color);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+.json-display {
+    position: relative;
+}
+
+.api-result {
+    border: 2px solid rgba(76, 175, 80, 0.4);
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(67, 233, 123, 0.1));
+}
+
+.api-result-container h3 {
+    color: var(--success-color);
+    text-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+}
+
+/* Enhanced button styles */
+.result-btn {
+    background: linear-gradient(135deg, var(--glass-bg), var(--glass-hover));
+    border: 1px solid var(--glass-border);
+    color: var(--text-light);
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all var(--transition-speed);
+    backdrop-filter: blur(10px);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.result-btn:hover {
+    background: linear-gradient(135deg, var(--glass-hover), rgba(255, 255, 255, 0.2));
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+.copy-json-btn {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: var(--text-dark);
+}
+
+.copy-json-btn:hover {
+    background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
+}
+
+.download-json-btn {
+    background: linear-gradient(135deg, var(--secondary-color), var(--accent-color));
+}
+
+.download-json-btn:hover {
+    background: linear-gradient(135deg, var(--accent-color), var(--secondary-color));
 }
 
 /* ===================================

@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Professional AI Image Generation Platform - Upload references, craft prompts, generate stunning images">
-    <meta name="keywords" content="AI image generation, prompt engineering, image creation, AI art, Gemini">
+    <meta name="description" content="AI-powered image analysis and prompt enhancement platform - Upload images for AI analysis and get optimized prompts">
+    <meta name="keywords" content="AI image analysis, prompt enhancement, image description, AI art prompts, Gemini">
     <meta name="author" content="NanoBanana Team">
-    <title>🍌 Banana - AI Image Generation Platform</title>
+    <title>🍌 Banana - AI Image Analysis & Prompt Enhancement</title>
     <link rel="stylesheet" href="banana.css">
     <script src="https://cdn.jsdelivr.net/npm/axios@1.6.2/dist/axios.min.js"></script>
 </head>
@@ -20,10 +20,10 @@
         <header class="header">
             <h1 class="title">
                 <span class="banana-icon">🍌</span>
-                Banana
+                NanoBanana LAUNCH MODE
             </h1>
-            <p class="subtitle">Professional AI Image Generation Platform</p>
-            <p class="tagline">Upload • Prompt • Generate • Download</p>
+            <p class="subtitle">🚀 Professional AI Image Generation Platform</p>
+            <p class="tagline">Upload • Create JSON • Generate Images • Download Results</p>
         </header>
 
         <!-- Main Content -->
@@ -33,7 +33,7 @@
             <section class="card upload-card">
                 <div class="card-header">
                     <h2><span class="step-number">1</span> Upload Reference Images</h2>
-                    <p class="card-subtitle">Add images for style, composition, or identity reference</p>
+                    <p class="card-subtitle">Add images for AI analysis, description, or style reference</p>
                 </div>
                 
                 <div class="drop-zone" id="dropZone">
@@ -295,12 +295,15 @@
                             API Key
                             <a href="https://aistudio.google.com/app/apikey" target="_blank" class="get-key-link">Get Free Key</a>
                         </label>
-                        <input 
-                            type="password" 
-                            id="apiKey" 
-                            class="api-input" 
-                            placeholder="Enter your Gemini API key..."
-                        >
+                        <div class="api-key-container">
+                            <input 
+                                type="password" 
+                                id="apiKey" 
+                                class="api-input api-key-input" 
+                                placeholder="Enter your Gemini API key..."
+                            >
+                            <button type="button" id="validateKeyBtn" class="btn-validate">Validate Key</button>
+                        </div>
                     </div>
 
                     <div class="api-input-group">
@@ -317,13 +320,21 @@
                 </div>
 
                 <div class="generation-actions">
+                    <button class="btn-generate" id="generateJsonBtn">
+                        <span class="btn-icon">🍌</span>
+                        Generate Nano Banana JSON
+                    </button>
                     <button class="btn-generate" id="generateBtn">
-                        <span class="btn-icon">🚀</span>
-                        Generate Image
+                        <span class="btn-icon">🔍</span>
+                        Analyze & Generate
                     </button>
                     <button class="btn-secondary" id="enhancePromptBtn">
                         <span class="btn-icon">✨</span>
                         Enhance Prompt with AI
+                    </button>
+                    <button class="btn-secondary" id="sendToApiBtn" style="display: none;">
+                        <span class="btn-icon">🚀</span>
+                        Send to Nano Banana API
                     </button>
                 </div>
 

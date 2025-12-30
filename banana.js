@@ -18,6 +18,7 @@ const state = {
     referenceImages: [],
     apiKey: null,
     selectedModel: 'gemini-1.5-flash-latest',  // Latest stable Gemini model
+    currentJSON: null,  // Store generated Nano Banana JSON
     parameters: {
         aspectRatio: '9:16',
         stylePreset: 'photorealistic',
@@ -95,6 +96,40 @@ function setupEventListeners() {
         saveSettings();
     });
     
+    // Add API key validation button functionality
+    const validateKeyBtn = document.getElementById('validateKeyBtn');
+    if (validateKeyBtn) {
+        validateKeyBtn.addEventListener('click', async () => {
+            const apiKey = state.apiKey;
+            if (!apiKey) {
+                showToast('Please enter an API key first', 'error');
+                return;
+            }
+            
+            validateKeyBtn.disabled = true;
+            validateKeyBtn.textContent = 'Validating...';
+            showLoading('Validating API key...');
+            
+            try {
+                const validation = await validateApiKey(apiKey);
+                hideLoading();
+                
+                if (validation.isValid) {
+                    showToast(`✅ API key validated! Found ${validation.totalModels} models`, 'success');
+                    populateModelSelect(validation.categorizedModels);
+                } else {
+                    showToast(validation.error, 'error');
+                }
+            } catch (error) {
+                hideLoading();
+                showToast('Failed to validate API key', 'error');
+            }
+            
+            validateKeyBtn.disabled = false;
+            validateKeyBtn.textContent = 'Validate Key';
+        });
+    }
+    
     // Model selection
     elements.modelSelect.addEventListener('change', () => {
         state.selectedModel = elements.modelSelect.value;
@@ -105,6 +140,18 @@ function setupEventListeners() {
     elements.generateBtn.addEventListener('click', handleGenerate);
     elements.enhancePromptBtn.addEventListener('click', handleEnhancePrompt);
     elements.clearResultsBtn.addEventListener('click', clearResults);
+    
+    // Nano Banana buttons
+    const generateJsonBtn = document.getElementById('generateJsonBtn');
+    const sendToApiBtn = document.getElementById('sendToApiBtn');
+    
+    if (generateJsonBtn) {
+        generateJsonBtn.addEventListener('click', handleGenerateJSON);
+    }
+    
+    if (sendToApiBtn) {
+        sendToApiBtn.addEventListener('click', handleSendToAPI);
+    }
     
     // Sliders with live updates
     const creativitySlider = document.getElementById('creativity');
@@ -328,7 +375,7 @@ async function handleGenerate() {
         return;
     }
     
-    showLoading('Generating your image...');
+    showLoading(state.referenceImages.length > 0 ? 'Analyzing your images with AI...' : 'Enhancing your prompt with AI...');
     
     try {
         // Build the prompt with all context
@@ -341,7 +388,8 @@ async function handleGenerate() {
         
         // Display result
         displayResult(result, 'generation');
-        showToast('Image generated successfully!', 'success');
+        const successMsg = state.referenceImages.length > 0 ? 'Images analyzed successfully!' : 'Prompt enhanced successfully!';
+        showToast(successMsg, 'success');
         
     } catch (error) {
         hideLoading();
@@ -394,30 +442,54 @@ function buildFullPrompt() {
     const positive = elements.positivePrompt.value.trim();
     const negative = elements.negativePrompt.value.trim();
     
-    let prompt = `Create a ${params.stylePreset} image with the following specifications:\n\n`;
-    prompt += `SUBJECT & CONTENT:\n${positive}\n\n`;
-    
-    if (negative) {
-        prompt += `AVOID:\n${negative}\n\n`;
-    }
-    
-    prompt += `TECHNICAL SPECIFICATIONS:\n`;
-    prompt += `- Aspect Ratio: ${params.aspectRatio}\n`;
-    prompt += `- Quality: ${params.quality}\n`;
-    prompt += `- Output Size: ${params.outputSize}px\n`;
-    prompt += `- Lighting: ${params.lighting}\n`;
-    prompt += `- Mood: ${params.mood}\n`;
-    prompt += `- Color Palette: ${params.colorPalette}\n`;
-    prompt += `- Camera Angle: ${params.cameraAngle}\n`;
-    prompt += `- Creativity Level: ${params.creativity}%\n`;
-    
+    // If there are reference images, analyze them
     if (state.referenceImages.length > 0) {
-        prompt += `\nREFERENCE IMAGES: ${state.referenceImages.length} image(s) provided for style/composition reference\n`;
+        let prompt = `Please analyze the provided image(s) and create a detailed, professional description that could be used for image generation. `;
+        
+        if (positive) {
+            prompt += `The user wants: "${positive}". `;
+        }
+        
+        prompt += `Based on the reference image(s), provide:\n\n`;
+        prompt += `1. DETAILED VISUAL DESCRIPTION: Describe what you see in rich, specific detail\n`;
+        prompt += `2. STYLE ANALYSIS: Identify the artistic style, lighting, composition, and mood\n`;
+        prompt += `3. ENHANCED PROMPT: Create an optimized prompt for AI image generation based on this analysis\n`;
+        prompt += `4. TECHNICAL DETAILS: Note aspect ratio, color palette, camera angle, etc.\n\n`;
+        
+        if (negative) {
+            prompt += `AVOID: ${negative}\n\n`;
+        }
+        
+        prompt += `Format your response clearly with headings for each section. Make it detailed and professional for image generation purposes.`;
+        
+        return prompt;
+    } else {
+        // Text-only generation for prompt enhancement
+        let prompt = `You are a professional AI image generation expert. Help enhance and optimize the following prompt:\n\n`;
+        prompt += `USER'S IDEA: "${positive}"\n\n`;
+        
+        if (negative) {
+            prompt += `THINGS TO AVOID: ${negative}\n\n`;
+        }
+        
+        prompt += `DESIRED STYLE: ${params.stylePreset}\n`;
+        prompt += `ASPECT RATIO: ${params.aspectRatio}\n`;
+        prompt += `QUALITY: ${params.quality}\n`;
+        prompt += `LIGHTING: ${params.lighting}\n`;
+        prompt += `MOOD: ${params.mood}\n`;
+        prompt += `COLOR PALETTE: ${params.colorPalette}\n`;
+        prompt += `CAMERA ANGLE: ${params.cameraAngle}\n\n`;
+        
+        prompt += `Please provide:\n`;
+        prompt += `1. ENHANCED DESCRIPTION: A detailed, vivid description (150-200 words)\n`;
+        prompt += `2. TECHNICAL KEYWORDS: Specific terms to improve image quality\n`;
+        prompt += `3. STYLE KEYWORDS: Artistic direction and aesthetic terms\n`;
+        prompt += `4. OPTIMIZED PROMPT: A final, polished prompt ready for image generation\n\n`;
+        
+        prompt += `Make it professional, specific, and optimized for AI image generation tools.`;
+        
+        return prompt;
     }
-    
-    prompt += `\nGenerate a detailed, professional ${params.stylePreset} image based on these specifications.`;
-    
-    return prompt;
 }
 
 /**
@@ -458,7 +530,14 @@ function buildEnhancementPrompt() {
  * Call Gemini API
  */
 async function callGeminiAPI(prompt, type) {
-    const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${state.selectedModel}:generateContent`;
+    // Clean the model name - remove any 'models/' prefix if present
+    const cleanModelName = state.selectedModel.replace('models/', '');
+    console.log('🔍 Using model:', cleanModelName);
+    console.log('🔍 Original model name:', state.selectedModel);
+    
+    // Use URL parameter for API key instead of header to avoid CORS issues
+    const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${cleanModelName}:generateContent?key=${state.apiKey}`;
+    console.log('🔍 API Endpoint:', apiEndpoint.replace(state.apiKey, '[API_KEY_HIDDEN]'));
     
     const requestBody = {
         contents: [{
@@ -488,15 +567,31 @@ async function callGeminiAPI(prompt, type) {
         ];
     }
     
-    const response = await axios.post(apiEndpoint, requestBody, {
-        headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': state.apiKey
-        },
-        timeout: 60000
-    });
-    
-    return response.data;
+    try {
+        const response = await axios.post(apiEndpoint, requestBody, {
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            timeout: 60000
+        });
+        
+        console.log('✅ API call successful');
+        return response.data;
+        
+    } catch (error) {
+        console.error('❌ API call failed:', error);
+        
+        // If it's a CORS error, provide helpful information
+        if (error.message.includes('Network Error') || error.code === 'ERR_NETWORK') {
+            console.warn('🔄 Detected potential CORS issue. This might be due to browser security policies.');
+            console.log('💡 Possible solutions:');
+            console.log('1. Use a local server (not file:// protocol)');
+            console.log('2. Use a CORS proxy');
+            console.log('3. Use the official Google AI SDK');
+        }
+        
+        throw error;
+    }
 }
 
 /**
@@ -543,23 +638,38 @@ function displayResult(result, type) {
             applyEnhancedPrompt(this.dataset.text);
         });
     } else {
-        // For generation, display the AI's response
+        // For generation, display the AI's analysis/enhancement
+        const title = state.referenceImages.length > 0 ? '🔍 AI Image Analysis' : '✨ AI Prompt Enhancement';
         resultItem.innerHTML = `
-            <div class="result-image-container">
-                <h3>🎨 Generated Content</h3>
-                <pre style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 12px; color: white; white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(generatedText)}</pre>
+            <div class="result-content-container">
+                <h3>${title}</h3>
+                <div class="ai-response">
+                    <pre style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 12px; color: white; white-space: pre-wrap; word-wrap: break-word; font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.6;">${escapeHtml(generatedText)}</pre>
+                </div>
             </div>
             <div class="result-actions">
                 <button class="result-btn copy-result-btn" data-text="${escapeForAttribute(generatedText)}">
-                    📋 Copy Response
+                    📋 Copy Analysis
                 </button>
+                ${state.referenceImages.length === 0 ? `
+                <button class="result-btn apply-enhanced-btn" data-text="${escapeForAttribute(generatedText)}">
+                    ✅ Extract Optimized Prompt
+                </button>
+                ` : ''}
             </div>
         `;
         
-        // Add event listener
+        // Add event listeners
         resultItem.querySelector('.copy-result-btn').addEventListener('click', function() {
             copyText(this.dataset.text);
         });
+        
+        const applyBtn = resultItem.querySelector('.apply-enhanced-btn');
+        if (applyBtn) {
+            applyBtn.addEventListener('click', function() {
+                applyEnhancedPrompt(this.dataset.text);
+            });
+        }
     }
     
     elements.resultsContent.insertBefore(resultItem, elements.resultsContent.firstChild);
@@ -701,26 +811,143 @@ function formatFileSize(bytes) {
 }
 
 /**
+ * Validate API Key
+ */
+async function validateApiKey(apiKey) {
+    try {
+        console.log('🔑 Validating API key...');
+        
+        // Use the listModels endpoint to validate the API key
+        const listModelsEndpoint = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+        
+        const response = await axios.get(listModelsEndpoint, {
+            timeout: 10000 // 10 second timeout
+        });
+        
+        const models = response.data.models || [];
+        console.log('✅ API key is valid!');
+        console.log(`Found ${models.length} available models`);
+        
+        // Categorize models by type
+        const categorized = categorizeModels(models);
+        
+        console.log('Text Generation models:', categorized.textGeneration.length);
+        console.log('Image Generation models:', categorized.imageGeneration.length);
+        console.log('Embedding models:', categorized.embedding.length);
+        
+        if (categorized.textGeneration.length === 0 && categorized.imageGeneration.length === 0) {
+            throw new Error('No suitable models found. Your API key may not have access to generation models.');
+        }
+        
+        return {
+            isValid: true,
+            allModels: models,
+            categorizedModels: {
+                ...categorized,
+                allModels: models
+            },
+            totalModels: models.length
+        };
+        
+    } catch (error) {
+        console.error('❌ API key validation failed:', error);
+        
+        let errorMessage = 'API key validation failed. ';
+        
+        if (error.response) {
+            const status = error.response.status;
+            
+            if (status === 400) {
+                errorMessage += 'Invalid API key format. Please check your key.';
+            } else if (status === 403) {
+                errorMessage += 'API key does not have permission to access models. Please check your Google AI Studio settings.';
+            } else if (status === 401) {
+                errorMessage += 'API key authentication failed. Please verify your key is correct.';
+            } else {
+                errorMessage += `Server error (${status}). Please try again later.`;
+            }
+        } else if (error.code === 'ENOTFOUND' || error.message.includes('Network Error')) {
+            errorMessage += 'Network connection failed. Please check your internet connection.';
+        } else if (error.code === 'TIMEOUT') {
+            errorMessage += 'Request timed out. Please try again.';
+        } else {
+            errorMessage += error.message || 'Unknown error occurred.';
+        }
+        
+        return {
+            isValid: false,
+            error: errorMessage
+        };
+    }
+}
+
+/**
+ * Categorize Models by Type
+ */
+function categorizeModels(models) {
+    const textGeneration = [];
+    const imageGeneration = [];
+    const embedding = [];
+    
+    models.forEach(model => {
+        const name = (model.name || '').toLowerCase();
+        const displayName = (model.displayName || '').toLowerCase();
+        const description = (model.description || '').toLowerCase();
+        
+        const combinedInfo = `${name} ${displayName} ${description}`;
+        
+        if (combinedInfo.includes('embedding')) {
+            embedding.push(model);
+        } else if (combinedInfo.includes('imagen') || combinedInfo.includes('image') && combinedInfo.includes('generat')) {
+            imageGeneration.push(model);
+        } else if (combinedInfo.includes('gemini') || combinedInfo.includes('chat') || combinedInfo.includes('text') || combinedInfo.includes('generat')) {
+            textGeneration.push(model);
+        } else {
+            // Default to text generation if uncertain
+            textGeneration.push(model);
+        }
+    });
+    
+    return {
+        textGeneration,
+        imageGeneration,
+        embedding
+    };
+}
+
+/**
  * Get Error Message
  */
 function getErrorMessage(error) {
+    console.error('Full error details:', error);
+    
     if (error.response) {
         const status = error.response.status;
         const errorData = error.response.data?.error;
         
-        if (status === 404) {
-            return 'Model not found. Please try a different model.';
-        } else if (status === 403 || status === 401) {
-            return 'Invalid API key. Please check your Google AI Studio API key.';
+        if (status === 400) {
+            if (errorData?.message?.includes('API key')) {
+                return 'Invalid API key. Please check your Gemini API key.';
+            }
+            return 'Bad request. Please check your input and try again.';
+        } else if (status === 403) {
+            return 'Access forbidden. Your API key may not have the required permissions.';
         } else if (status === 429) {
-            return 'Rate limit exceeded. Please wait and try again.';
+            return 'Rate limit exceeded. Please wait a moment and try again.';
+        } else if (status === 500) {
+            return 'Server error. Please try again in a moment.';
         } else {
-            return `API Error: ${errorData?.message || 'Unknown error'}`;
+            return `API error (${status}). Please try again.`;
         }
-    } else if (error.request) {
-        return 'Network error. Please check your internet connection.';
+    } else if (error.code === 'ENOTFOUND' || error.message?.includes('Network Error')) {
+        if (error.message?.includes('CORS') || error.config?.url?.includes('generativelanguage.googleapis.com')) {
+            return 'CORS error detected. Try refreshing the page or using a different browser. This is a known issue with direct API calls.';
+        }
+        return 'Network connection failed. Please check your internet connection.';
+    } else if (error.code === 'TIMEOUT') {
+        return 'Request timed out. Please try again.';
     } else {
-        return error.message || 'An unexpected error occurred';
+        return error.message || 'An unexpected error occurred.';
     }
 }
 
@@ -803,4 +1030,322 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
 } else {
     init();
+}
+
+/**
+ * Populate Model Select Dropdown
+ */
+function populateModelSelect(categorizedModels) {
+    const select = elements.modelSelect;
+    if (!select) return;
+    
+    // Clear existing options
+    select.innerHTML = '';
+    
+    // Add default option
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = 'Select a model...';
+    defaultOption.disabled = true;
+    select.appendChild(defaultOption);
+    
+    // Add Text Generation models
+    if (categorizedModels.textGeneration.length > 0) {
+        const textGroup = document.createElement('optgroup');
+        textGroup.label = `Text Generation (${categorizedModels.textGeneration.length})`;
+        
+        categorizedModels.textGeneration.forEach(model => {
+            const option = document.createElement('option');
+            option.value = model.name;
+            option.textContent = model.displayName || model.name.split('/').pop();
+            textGroup.appendChild(option);
+        });
+        
+        select.appendChild(textGroup);
+    }
+    
+    // Add Image Generation models (if any)
+    if (categorizedModels.imageGeneration.length > 0) {
+        const imageGroup = document.createElement('optgroup');
+        imageGroup.label = `Image Generation (${categorizedModels.imageGeneration.length})`;
+        
+        categorizedModels.imageGeneration.forEach(model => {
+            const option = document.createElement('option');
+            option.value = model.name;
+            option.textContent = model.displayName || model.name.split('/').pop();
+            imageGroup.appendChild(option);
+        });
+        
+        select.appendChild(imageGroup);
+    }
+    
+    // Set the first available model as default
+    if (categorizedModels.textGeneration.length > 0) {
+        const firstModel = categorizedModels.textGeneration[0];
+        select.value = firstModel.name;
+        state.selectedModel = firstModel.name;
+    } else if (categorizedModels.imageGeneration.length > 0) {
+        const firstModel = categorizedModels.imageGeneration[0];
+        select.value = firstModel.name;
+        state.selectedModel = firstModel.name;
+    }
+}
+
+/**
+ * Generate Nano Banana JSON Payload
+ */
+function generateNanoBananaJSON() {
+    const params = state.parameters;
+    const positive = elements.positivePrompt.value.trim();
+    const negative = elements.negativePrompt.value.trim().split(',').map(s => s.trim()).filter(s => s);
+    
+    // Build reference images array with Base64 data
+    const referenceImages = state.referenceImages.map((img, index) => ({
+        id: `ref_${index + 1}`,
+        type: "style_reference",
+        image_base64: img.base64,
+        weight: 0.8
+    }));
+    
+    // Build the complete Nano Banana JSON structure
+    const json = {
+        model: "nano-banana-pro-preview",
+        consistency_id: `generation_${Date.now()}`,
+        prompt: {
+            text: positive,
+            language: "en",
+            negative: negative
+        },
+        reference_images: referenceImages,
+        composition: {
+            framing: "medium_shot",
+            perspective: params.cameraAngle || "eye-level",
+            subject_placement: "center",
+            background: "contextual",
+            rule_of_thirds: true
+        },
+        style_parameters: {
+            genre: params.stylePreset,
+            mood: params.mood,
+            color_grading: params.colorPalette,
+            texture: "smooth"
+        },
+        technical_specifications: {
+            camera: {
+                look: "professional",
+                focal_length: "85mm",
+                aperture: "f/1.8",
+                depth_of_field: "soft background separation"
+            },
+            lighting: {
+                type: params.lighting,
+                setup: "soft directional key light",
+                direction: "three-quarter",
+                color_temperature: "neutral-warm"
+            },
+            quality: {
+                detail: "ultra-high",
+                realism: "very high"
+            }
+        },
+        output_settings: {
+            aspect_ratio: params.aspectRatio,
+            resolution: {
+                width: parseInt(params.outputSize),
+                height: parseInt(params.outputSize)
+            },
+            format: "png",
+            deliverables: ["generated_image"]
+        }
+    };
+    
+    return json;
+}
+
+/**
+ * Handle Generate JSON Button
+ */
+async function handleGenerateJSON() {
+    try {
+        const json = generateNanoBananaJSON();
+        state.currentJSON = json;
+        
+        // Display the JSON in the results
+        displayNanoBananaJSON(json);
+        
+        // Show the send to API button
+        document.getElementById('sendToApiBtn').style.display = 'inline-block';
+        
+        showToast('🍌 Nano Banana JSON generated successfully!', 'success');
+        
+    } catch (error) {
+        console.error('JSON generation error:', error);
+        showToast('Failed to generate JSON', 'error');
+    }
+}
+
+/**
+ * Display Nano Banana JSON
+ */
+function displayNanoBananaJSON(json) {
+    const resultItem = document.createElement('div');
+    resultItem.className = 'result-item';
+    
+    resultItem.innerHTML = `
+        <div class="json-result-container">
+            <h3>🍌 Nano Banana JSON Payload</h3>
+            <div class="json-stats">
+                <span class="json-stat">📊 Model: ${json.model}</span>
+                <span class="json-stat">🖼️ References: ${json.reference_images.length}</span>
+                <span class="json-stat">📐 Ratio: ${json.output_settings.aspect_ratio}</span>
+                <span class="json-stat">🎨 Style: ${json.style_parameters.genre}</span>
+            </div>
+            <div class="json-display">
+                <pre style="background: rgba(0,0,0,0.4); padding: 20px; border-radius: 12px; color: #FFD700; white-space: pre-wrap; word-wrap: break-word; font-family: 'Fira Code', 'Monaco', monospace; font-size: 13px; line-height: 1.4; max-height: 400px; overflow-y: auto;">${JSON.stringify(json, null, 2)}</pre>
+            </div>
+        </div>
+        <div class="result-actions">
+            <button class="result-btn copy-json-btn" data-json='${JSON.stringify(json)}'>
+                📋 Copy JSON
+            </button>
+            <button class="result-btn download-json-btn" data-json='${JSON.stringify(json)}'>
+                💾 Download JSON
+            </button>
+        </div>
+    `;
+    
+    // Add event listeners
+    resultItem.querySelector('.copy-json-btn').addEventListener('click', function() {
+        copyText(this.dataset.json);
+        showToast('JSON copied to clipboard!', 'success');
+    });
+    
+    resultItem.querySelector('.download-json-btn').addEventListener('click', function() {
+        downloadJSON(JSON.parse(this.dataset.json));
+    });
+    
+    elements.resultsContent.insertBefore(resultItem, elements.resultsContent.firstChild);
+    elements.resultsCard.style.display = 'block';
+    
+    // Scroll to results
+    setTimeout(() => {
+        resultItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 100);
+}
+
+/**
+ * Download JSON file
+ */
+function downloadJSON(json) {
+    const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nano-banana-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('JSON file downloaded!', 'success');
+}
+
+/**
+ * Send to Nano Banana API
+ */
+async function handleSendToAPI() {
+    if (!state.currentJSON) {
+        showToast('Please generate JSON first', 'error');
+        return;
+    }
+    
+    if (!state.apiKey) {
+        showToast('Please enter your API key first', 'error');
+        return;
+    }
+    
+    showLoading('🍌 Sending to Nano Banana API...');
+    
+    try {
+        // Use the Nano Banana endpoint
+        const nanoBananaEndpoint = 'https://api.nanobanana.ai/v1/generate';
+        
+        const response = await axios.post(nanoBananaEndpoint, state.currentJSON, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.apiKey}`,
+                'X-API-Key': state.apiKey
+            },
+            timeout: 120000 // 2 minute timeout for image generation
+        });
+        
+        hideLoading();
+        
+        console.log('🍌 Nano Banana API response:', response.data);
+        displayAPIResult(response.data);
+        showToast('🚀 Image generated successfully!', 'success');
+        
+    } catch (error) {
+        hideLoading();
+        console.error('Nano Banana API error:', error);
+        
+        if (error.response && error.response.status === 401) {
+            showToast('Invalid API key for Nano Banana API', 'error');
+        } else if (error.response && error.response.status === 429) {
+            showToast('Rate limit exceeded. Please wait and try again.', 'error');
+        } else {
+            showToast('Failed to generate image. Check console for details.', 'error');
+        }
+    }
+}
+
+/**
+ * Display API Result
+ */
+function displayAPIResult(result) {
+    const resultItem = document.createElement('div');
+    resultItem.className = 'result-item api-result';
+    
+    // Check if result contains an image URL or base64
+    let imageDisplay = '';
+    if (result.image_url) {
+        imageDisplay = `<img src="${result.image_url}" alt="Generated Image" style="max-width: 100%; border-radius: 12px; margin: 10px 0;">`;
+    } else if (result.image_base64) {
+        imageDisplay = `<img src="data:image/png;base64,${result.image_base64}" alt="Generated Image" style="max-width: 100%; border-radius: 12px; margin: 10px 0;">`;
+    }
+    
+    resultItem.innerHTML = `
+        <div class="api-result-container">
+            <h3>🚀 Nano Banana Generated Image</h3>
+            ${imageDisplay}
+            <div class="api-result-info">
+                <pre style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; color: white; font-size: 12px; max-height: 200px; overflow-y: auto;">${JSON.stringify(result, null, 2)}</pre>
+            </div>
+        </div>
+        <div class="result-actions">
+            <button class="result-btn copy-result-btn" data-result='${JSON.stringify(result)}'>
+                📋 Copy Result
+            </button>
+            ${result.image_url ? `<button class="result-btn download-image-btn" data-url="${result.image_url}">💾 Download Image</button>` : ''}
+        </div>
+    `;
+    
+    // Add event listeners
+    resultItem.querySelector('.copy-result-btn').addEventListener('click', function() {
+        copyText(this.dataset.result);
+    });
+    
+    const downloadBtn = resultItem.querySelector('.download-image-btn');
+    if (downloadBtn) {
+        downloadBtn.addEventListener('click', function() {
+            window.open(this.dataset.url, '_blank');
+        });
+    }
+    
+    elements.resultsContent.insertBefore(resultItem, elements.resultsContent.firstChild);
+    elements.resultsCard.style.display = 'block';
+    
+    // Scroll to results
+    setTimeout(() => {
+        resultItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 100);
 }
