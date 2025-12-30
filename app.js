@@ -7,7 +7,13 @@
  */
 const state = {
     images: [],
-    currentImageCount: 0
+    currentImageCount: 0,
+    compressionSettings: {
+        enabled: true,
+        quality: 0.7,  // 0.0 to 1.0
+        maxWidth: 1024,
+        maxHeight: 1024
+    }
 };
 
 /**
@@ -21,15 +27,89 @@ const elements = {
     emptyState: document.getElementById('emptyState'),
     toast: document.getElementById('toast'),
     toastMessage: document.getElementById('toastMessage'),
-    loadingOverlay: document.getElementById('loadingOverlay')
+    loadingOverlay: document.getElementById('loadingOverlay'),
+    compressionToggle: null,
+    qualitySlider: null,
+    qualityValue: null,
+    maxDimensionSelect: null,
+    settingsContent: null,
+    tokenCost: null
 };
 
 /**
  * Initialize Application
  */
 function init() {
+    // Get compression settings elements after DOM is ready
+    elements.compressionToggle = document.getElementById('compressionToggle');
+    elements.qualitySlider = document.getElementById('qualitySlider');
+    elements.qualityValue = document.getElementById('qualityValue');
+    elements.maxDimensionSelect = document.getElementById('maxDimensionSelect');
+    elements.settingsContent = document.getElementById('settingsContent');
+    elements.tokenCost = document.getElementById('tokenCost');
+    
     setupEventListeners();
-    console.log('🍌 NanoBanana-Base64 initialized!');
+    setupCompressionSettings();
+    console.log('🍌 NanoBanana-Base64 initialized with compression!');
+}
+
+/**
+ * Setup Compression Settings
+ */
+function setupCompressionSettings() {
+    // Toggle compression on/off
+    elements.compressionToggle.addEventListener('change', (e) => {
+        state.compressionSettings.enabled = e.target.checked;
+        elements.settingsContent.style.display = e.target.checked ? 'block' : 'none';
+        updateTokenCostEstimate();
+    });
+    
+    // Quality slider
+    elements.qualitySlider.addEventListener('input', (e) => {
+        const quality = parseInt(e.target.value);
+        state.compressionSettings.quality = quality / 100;
+        elements.qualityValue.textContent = quality + '%';
+        updateTokenCostEstimate();
+    });
+    
+    // Max dimensions select
+    elements.maxDimensionSelect.addEventListener('change', (e) => {
+        const maxDimension = parseInt(e.target.value);
+        state.compressionSettings.maxWidth = maxDimension;
+        state.compressionSettings.maxHeight = maxDimension;
+        updateTokenCostEstimate();
+    });
+    
+    // Initial cost estimate
+    updateTokenCostEstimate();
+}
+
+/**
+ * Update Token Cost Estimate
+ */
+function updateTokenCostEstimate() {
+    if (!elements.tokenCost) return;
+    
+    if (state.images.length === 0) {
+        elements.tokenCost.textContent = '~$0.00';
+        return;
+    }
+    
+    // Calculate total Base64 size
+    let totalBase64Length = 0;
+    state.images.forEach(img => {
+        totalBase64Length += img.base64.length;
+    });
+    
+    // Estimate tokens (roughly 1 token per 4 characters for Base64)
+    const estimatedTokens = Math.ceil(totalBase64Length / 4);
+    
+    // Estimate cost (example: $0.002 per 1K tokens for input - adjust based on actual model)
+    const estimatedCost = (estimatedTokens / 1000) * 0.002;
+    
+    elements.tokenCost.textContent = estimatedCost < 0.01 
+        ? '< $0.01' 
+        : `~$${estimatedCost.toFixed(2)}`;
 }
 
 /**
@@ -139,18 +219,49 @@ function processFiles(files) {
 function processImage(file) {
     const reader = new FileReader();
     
-    reader.onload = (e) => {
-        const imageData = {
-            id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-            name: file.name,
-            size: formatFileSize(file.size),
-            base64: e.target.result,
-            preview: e.target.result
-        };
-        
-        state.images.push(imageData);
-        addImageToGallery(imageData);
-        updateEmptyState();
+    reader.onload = async (e) => {
+        // Check if compression is enabled
+        if (state.compressionSettings.enabled) {
+            try {
+                const compressedData = await compressImage(e.target.result, file.type);
+                const originalSize = file.size;
+                const compressedSize = Math.round((compressedData.length * 3) / 4); // Approximate Base64 to bytes
+                
+                const imageData = {
+                    id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                    name: file.name,
+                    size: formatFileSize(compressedSize),
+                    originalSize: formatFileSize(originalSize),
+                    compressionRatio: ((1 - compressedSize / originalSize) * 100).toFixed(1),
+                    base64: compressedData,
+                    preview: compressedData
+                };
+                
+                state.images.push(imageData);
+                addImageToGallery(imageData);
+                updateEmptyState();
+                updateTokenCostEstimate();
+            } catch (error) {
+                console.error('Compression failed:', error);
+                showToast('Compression failed for: ' + file.name, 'error');
+            }
+        } else {
+            // No compression
+            const imageData = {
+                id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                name: file.name,
+                size: formatFileSize(file.size),
+                originalSize: formatFileSize(file.size),
+                compressionRatio: '0',
+                base64: e.target.result,
+                preview: e.target.result
+            };
+            
+            state.images.push(imageData);
+            addImageToGallery(imageData);
+            updateEmptyState();
+            updateTokenCostEstimate();
+        }
     };
     
     reader.onerror = () => {
@@ -161,6 +272,59 @@ function processImage(file) {
 }
 
 /**
+ * Compress Image using Canvas
+ */
+async function compressImage(dataURL, mimeType) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Calculate new dimensions while maintaining aspect ratio
+            let width = img.width;
+            let height = img.height;
+            const maxWidth = state.compressionSettings.maxWidth;
+            const maxHeight = state.compressionSettings.maxHeight;
+            
+            if (width > maxWidth || height > maxHeight) {
+                const ratio = Math.min(maxWidth / width, maxHeight / height);
+                width = Math.round(width * ratio);
+                height = Math.round(height * ratio);
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Draw image on canvas with high quality
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // Convert to Base64 with specified quality
+            // For JPEG/WebP, quality matters. PNG ignores quality parameter.
+            const quality = state.compressionSettings.quality;
+            let outputMimeType = mimeType;
+            
+            // Convert PNG to JPEG for better compression if enabled
+            if (mimeType === 'image/png' && state.compressionSettings.convertPngToJpeg) {
+                outputMimeType = 'image/jpeg';
+            }
+            
+            const compressedDataURL = canvas.toDataURL(outputMimeType, quality);
+            resolve(compressedDataURL);
+        };
+        
+        img.onerror = () => {
+            reject(new Error('Failed to load image'));
+        };
+        
+        img.src = dataURL;
+    });
+}
+
+/**
  * Add Image to Gallery
  */
 function addImageToGallery(imageData) {
@@ -168,8 +332,18 @@ function addImageToGallery(imageData) {
     galleryItem.className = 'gallery-item';
     galleryItem.dataset.id = imageData.id;
     
+    // Show compression info if available
+    const compressionInfo = imageData.compressionRatio > 0 
+        ? `<div class="compression-badge">-${imageData.compressionRatio}%</div>` 
+        : '';
+    
+    const sizeInfo = imageData.compressionRatio > 0
+        ? `<div class="gallery-item-size">${imageData.size} (was ${imageData.originalSize})</div>`
+        : `<div class="gallery-item-size">${imageData.size}</div>`;
+    
     galleryItem.innerHTML = `
         <img src="${imageData.preview}" alt="${imageData.name}">
+        ${compressionInfo}
         <div class="gallery-item-overlay">
             <div class="gallery-item-text">
                 <span class="icon">📋</span>
@@ -178,7 +352,7 @@ function addImageToGallery(imageData) {
         </div>
         <div class="gallery-item-info">
             <div class="gallery-item-name" title="${imageData.name}">${imageData.name}</div>
-            <div class="gallery-item-size">${imageData.size}</div>
+            ${sizeInfo}
         </div>
     `;
     

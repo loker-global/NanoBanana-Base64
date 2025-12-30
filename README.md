@@ -39,22 +39,36 @@ To create the most intuitive, beautiful, and efficient image-to-Base64 converter
 - Traditional file picker as fallback
 - Support for common image formats: JPG, PNG, GIF, SVG, WebP, BMP
 
-#### 2. **Visual Image Gallery**
+#### 2. **Smart Image Compression**
+- Canvas-based compression using canonical vectors
+- Configurable quality settings (10% - 100%)
+- Flexible dimension limits (512px to Original)
+- Real-time compression ratio display
+- Reduces token costs by up to 90%+
+- Perfect for JSON generation and API usage
+
+#### 3. **Visual Image Gallery**
 - Instantly preview uploaded images in a beautiful grid layout
+- Compression savings badge on each image
 - Hover effects to indicate interactivity
 - Visual feedback on selection and conversion
 
-#### 3. **One-Click Base64 Conversion**
+#### 4. **One-Click Base64 Conversion**
 - Click any image to instantly generate Base64 string
 - Automatic clipboard copy on generation
 - No additional steps required
 
-#### 4. **Smart Clipboard Management**
+#### 5. **Smart Clipboard Management**
 - Automatic copy-to-clipboard functionality
 - Visual confirmation of successful copy
 - Toast notifications for user feedback
 
-#### 5. **Modern, Award-Winning UI**
+#### 6. **Token Cost Calculator**
+- Real-time estimation of LLM token costs
+- Based on actual Base64 string length
+- Helps optimize for AI/JSON workflows
+
+#### 7. **Modern, Award-Winning UI**
 - Stunning gradient backgrounds
 - Glassmorphism design elements
 - Smooth animations and transitions
@@ -72,6 +86,8 @@ To create the most intuitive, beautiful, and efficient image-to-Base64 converter
 
 #### As an API Developer
 - **I want to** convert images for JSON payloads **so that** I can test API requests with embedded images
+- **I want to** compress images before encoding **so that** I don't waste money on token costs
+- **I want to** see the token cost estimate **so that** I can budget my API usage
 - **I want to** quickly access Base64 strings **so that** I can integrate them with Nano Banana platform
 
 #### As a Designer
@@ -156,20 +172,42 @@ To create the most intuitive, beautiful, and efficient image-to-Base64 converter
 ```
 1. User lands on page
    ↓
-2. User drags images or clicks to browse
+2. User configures compression settings (optional)
    ↓
-3. Images display in gallery with preview
+3. User drags images or clicks to browse
    ↓
-4. User clicks on desired image
+4. Images are compressed using Canvas API
    ↓
-5. Base64 generated instantly
+5. Compressed images display in gallery with savings badge
    ↓
-6. Base64 automatically copied to clipboard
+6. Token cost estimate updates automatically
    ↓
-7. Success notification appears
+7. User clicks on desired image
    ↓
-8. User pastes into their project
+8. Base64 generated instantly
+   ↓
+9. Base64 automatically copied to clipboard
+   ↓
+10. Success notification appears
+   ↓
+11. User pastes into their JSON/code with confidence
 ```
+
+### 💰 Cost Savings Example
+
+**Without Compression:**
+- Original Image: 2MB
+- Base64 String: ~2.7MB (3M characters)
+- Estimated Tokens: ~750K tokens
+- Cost (at $0.002/1K tokens): **~$1.50 per image**
+
+**With Compression (70% quality, 1024px max):**
+- Compressed Image: ~150KB
+- Base64 String: ~200KB
+- Estimated Tokens: ~50K tokens
+- Cost (at $0.002/1K tokens): **~$0.10 per image**
+
+**💡 Savings: 90%+ reduction in token costs!**
 
 ---
 
@@ -185,13 +223,15 @@ To create the most intuitive, beautiful, and efficient image-to-Base64 converter
 ### 🚀 Future Enhancements (v2.0+)
 
 - [ ] Base64 to image conversion (reverse operation)
-- [ ] Image compression before encoding
+- [x] ~~Image compression before encoding~~ ✅ **DONE in v1.0**
 - [ ] Custom output format (data URI, raw Base64, etc.)
 - [ ] Batch download as JSON file
 - [ ] History of conversions (session storage)
 - [ ] PWA support (offline functionality)
 - [ ] Image editing (crop, resize) before conversion
 - [ ] Multiple encoding formats (Base64, hex, etc.)
+- [ ] WebP format optimization
+- [ ] Batch compression presets
 
 ---
 

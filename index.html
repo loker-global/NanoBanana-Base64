@@ -44,6 +44,41 @@
                     <p class="drop-zone-hint">Supports: JPG, PNG, GIF, SVG, WebP, BMP</p>
                 </div>
             </div>
+
+            <!-- Compression Settings -->
+            <div class="compression-settings">
+                <div class="settings-header">
+                    <h3>🔧 Compression Settings</h3>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="compressionToggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="settings-content" id="settingsContent">
+                    <div class="setting-item">
+                        <label for="qualitySlider">Quality: <span id="qualityValue">70%</span></label>
+                        <input type="range" id="qualitySlider" min="10" max="100" value="70" class="slider">
+                        <p class="setting-hint">Lower = smaller file, higher = better quality</p>
+                    </div>
+                    <div class="setting-item">
+                        <label for="maxDimensionSelect">Max Dimensions:</label>
+                        <select id="maxDimensionSelect" class="dimension-select">
+                            <option value="512">512px (Tiny - for icons)</option>
+                            <option value="1024" selected>1024px (Small - for thumbnails)</option>
+                            <option value="1920">1920px (Medium - for web)</option>
+                            <option value="2560">2560px (Large - high quality)</option>
+                            <option value="99999">Original (No resize)</option>
+                        </select>
+                        <p class="setting-hint">Images larger than this will be resized</p>
+                    </div>
+                    <div class="setting-item">
+                        <div class="cost-estimate" id="costEstimate">
+                            <span class="cost-icon">💰</span>
+                            <span class="cost-text">Token cost: <strong id="tokenCost">~$0.00</strong></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <!-- Instructions Section -->
