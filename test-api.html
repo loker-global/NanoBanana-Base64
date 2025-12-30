@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Gemini API</title>
+</head>
+<body>
+    <h1>Test Gemini API</h1>
+    <input type="password" id="apiKey" placeholder="Enter API key">
+    <button onclick="testAPI()">Test API</button>
+    <div id="result"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.2/dist/axios.min.js"></script>
+    <script>
+        async function testAPI() {
+            const apiKey = document.getElementById('apiKey').value;
+            if (!apiKey) {
+                alert('Please enter API key');
+                return;
+            }
+            
+            console.log('Testing API with key:', apiKey.substring(0, 10) + '...');
+            
+            try {
+                // First, test listing models
+                console.log('Testing list models...');
+                const listResponse = await axios.get(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, {
+                    timeout: 10000
+                });
+                
+                console.log('Models response:', listResponse.data);
+                
+                // Find a good model to test
+                const models = listResponse.data.models || [];
+                const textModel = models.find(m => m.name.includes('gemini') && m.name.includes('flash'));
+                
+                if (!textModel) {
+                    document.getElementById('result').innerHTML = 'No suitable model found';
+                    return;
+                }
+                
+                console.log('Testing with model:', textModel.name);
+                
+                // Test generate content
+                const generateResponse = await axios.post(
+                    `https://generativelanguage.googleapis.com/v1beta/models/${textModel.name}:generateContent?key=${apiKey}`,
+                    {
+                        contents: [{
+                            parts: [{
+                                text: "Say hello world"
+                            }]
+                        }]
+                    },
+                    {
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        timeout: 10000
+                    }
+                );
+                
+                console.log('Generate response:', generateResponse.data);
+                document.getElementById('result').innerHTML = '<pre>' + JSON.stringify(generateResponse.data, null, 2) + '</pre>';
+                
+            } catch (error) {
+                console.error('Test error:', error);
+                document.getElementById('result').innerHTML = 'Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
