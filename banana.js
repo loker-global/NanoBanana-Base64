@@ -56,6 +56,7 @@ const elements = {
 function init() {
     setupEventListeners();
     setupParameterListeners();
+    setupKeyboardShortcuts();
     loadSavedSettings();
     console.log('🍌 Banana AI Platform initialized!');
 }
@@ -260,7 +261,7 @@ function removeImage(id) {
     state.referenceImages = state.referenceImages.filter(img => img.id !== id);
     const item = document.querySelector(`.reference-item[data-id="${id}"]`);
     if (item) {
-        // Use CSS animation defined in styles (scaleOut animation)
+        // Apply scaleOut animation (duration matches CSS animation timing)
         item.style.animation = 'scaleOut 0.3s ease';
         setTimeout(() => item.remove(), 300);
     }
@@ -287,10 +288,12 @@ function updateCostEstimate() {
     const imageCount = state.referenceImages.length;
     const variations = parseInt(state.parameters.variations) || 1;
     
-    // Rough estimation based on image count and variations
+    // Cost estimation based on:
+    // - Base cost per generation
+    // - Additional cost per reference image
+    // - Cost scales with number of variations
     const baseCost = 0.002; // per generation
     const imageCost = imageCount * 0.001; // per image
-    const variationCost = variations * baseCost;
     
     const totalCost = (baseCost + imageCost) * variations;
     
@@ -762,27 +765,29 @@ function loadSavedSettings() {
 }
 
 /**
- * Keyboard Shortcuts
+ * Setup Keyboard Shortcuts
  */
-document.addEventListener('keydown', (e) => {
-    // Ctrl/Cmd + Enter to generate
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
-        handleGenerate();
-    }
-    
-    // Ctrl/Cmd + E to enhance prompt
-    if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
-        e.preventDefault();
-        handleEnhancePrompt();
-    }
-    
-    // Ctrl/Cmd + O to open file picker
-    if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
-        e.preventDefault();
-        elements.fileInput.click();
-    }
-});
+function setupKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        // Ctrl/Cmd + Enter to generate
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            handleGenerate();
+        }
+        
+        // Ctrl/Cmd + E to enhance prompt
+        if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+            e.preventDefault();
+            handleEnhancePrompt();
+        }
+        
+        // Ctrl/Cmd + O to open file picker
+        if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+            e.preventDefault();
+            elements.fileInput.click();
+        }
+    });
+}
 
 // Initialize the application when DOM is ready
 if (document.readyState === 'loading') {
@@ -790,19 +795,3 @@ if (document.readyState === 'loading') {
 } else {
     init();
 }
-
-// Add scale-out animation for removing items
-const style = document.createElement('style');
-style.textContent = `
-@keyframes scaleOut {
-    from {
-        opacity: 1;
-        transform: scale(1);
-    }
-    to {
-        opacity: 0;
-        transform: scale(0.8);
-    }
-}
-`;
-document.head.appendChild(style);
