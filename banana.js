@@ -4,12 +4,20 @@
 // ===================================
 
 /**
+ * Configuration Constants
+ */
+const CONFIG = {
+    MAX_REFERENCE_IMAGES: 3,  // Maximum reference images to send to API
+    DEFAULT_COST_PER_GENERATION: 0.002,  // Base cost in USD
+    COST_PER_IMAGE: 0.001,  // Additional cost per reference image
+};
+/**
  * Application State
  */
 const state = {
     referenceImages: [],
     apiKey: null,
-    selectedModel: 'gemini-1.5-flash',
+    selectedModel: 'gemini-1.5-flash-latest',  // Latest stable Gemini model
     parameters: {
         aspectRatio: '9:16',
         stylePreset: 'photorealistic',
@@ -292,8 +300,8 @@ function updateCostEstimate() {
     // - Base cost per generation
     // - Additional cost per reference image
     // - Cost scales with number of variations
-    const baseCost = 0.002; // per generation
-    const imageCost = imageCount * 0.001; // per image
+    const baseCost = CONFIG.DEFAULT_COST_PER_GENERATION;
+    const imageCost = imageCount * CONFIG.COST_PER_IMAGE;
     
     const totalCost = (baseCost + imageCost) * variations;
     
@@ -468,10 +476,10 @@ async function callGeminiAPI(prompt, type) {
     
     // Add reference images if available and not just enhancing
     if (type === 'generate' && state.referenceImages.length > 0) {
-        // Add images to the request
+        // Add images to the request (limit to MAX_REFERENCE_IMAGES)
         requestBody.contents[0].parts = [
             { text: prompt },
-            ...state.referenceImages.slice(0, 3).map(img => ({
+            ...state.referenceImages.slice(0, CONFIG.MAX_REFERENCE_IMAGES).map(img => ({
                 inlineData: {
                     mimeType: getMimeType(img.base64),
                     data: img.base64.split(',')[1]
@@ -729,6 +737,7 @@ function escapeHtml(text) {
  * Escape for Attribute
  */
 function escapeForAttribute(text) {
+    if (!text) return '';
     return text
         .replace(/\\/g, '\\\\')
         .replace(/'/g, "\\'")
