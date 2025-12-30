@@ -1409,20 +1409,23 @@ async function handleNanoBananaGeneration(selectedModelName) {
     });
     
     console.log(`✅ Nano Banana image generation successful with model: ${selectedModelName}`);
-    hideLoading();
     
-    // Handle Nano Banana response
+    // Handle Nano Banana response before hiding loading
     if (response.data?.image_base64) {
+        hideLoading();
         displayGeneratedImage(response.data.image_base64, 'base64', selectedModelName);
         showToast('Image generated successfully!', 'success');
     } else if (response.data?.image_url) {
+        hideLoading();
         displayGeneratedImage(response.data.image_url, 'url', selectedModelName);
         showToast('Image generated successfully!', 'success');
     } else if (response.data?.result) {
+        hideLoading();
         // Alternative response format
         displayAPIResponse(response.data);
         showToast('Generation completed!', 'success');
     } else {
+        hideLoading();
         throw new Error('Unexpected response format from Nano Banana API');
     }
 }
@@ -1539,7 +1542,7 @@ function displayGeneratedImage(imageData, format, modelName) {
     
     responseContent.innerHTML = `
         <div class="image-response">
-            <h4>🎨 Generated Image from Nano Banana</h4>
+            <h4>🎨 Generated Image</h4>
             <div class="generated-image-container">
                 ${imageHtml}
             </div>
