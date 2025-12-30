@@ -8,6 +8,7 @@
     <meta name="author" content="NanoBanana Team">
     <title>🍌 NanoBanana-Base64 | Image to Base64 Converter</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.2/dist/axios.min.js"></script>
 </head>
 <body>
     <!-- Background Gradient -->
@@ -114,13 +115,223 @@
 
         <!-- Gallery Section -->
         <section class="gallery-section" id="gallerySection">
-            <h2 class="gallery-title">Your Images</h2>
+            <div class="gallery-header">
+                <h2 class="gallery-title">Your Images</h2>
+                <button class="launch-mode-btn" id="launchModeBtn" style="display: none;">
+                    🚀 LAUNCH MODE
+                </button>
+            </div>
             <div class="gallery" id="gallery">
                 <!-- Images will be dynamically added here -->
             </div>
             <div class="empty-state" id="emptyState">
                 <div class="empty-icon">🖼️</div>
                 <p>No images yet. Upload some to get started!</p>
+            </div>
+        </section>
+
+        <!-- LAUNCH MODE Section (initially hidden) -->
+        <section class="launch-mode-section" id="launchModeSection" style="display: none;">
+            <div class="launch-header">
+                <h2 class="launch-title">🚀 LAUNCH MODE - AI Image Generation</h2>
+                <button class="back-btn" id="backToGalleryBtn">← Back to Gallery</button>
+            </div>
+
+            <!-- API Key Input -->
+            <div class="api-key-section" id="apiKeySection">
+                <div class="api-key-card">
+                    <h3>🔑 Google API Key Required</h3>
+                    <p>Enter your Google API key to use the Nano Banana Pro model. Your key is never stored.</p>
+                    <input type="password" id="apiKeyInput" placeholder="Enter your API key..." class="api-key-input">
+                    <button class="btn-primary" id="setApiKeyBtn">Set API Key</button>
+                </div>
+            </div>
+
+            <!-- Main Launch Interface (hidden until API key is set) -->
+            <div class="launch-interface" id="launchInterface" style="display: none;">
+                
+                <!-- Master Prompt Section -->
+                <div class="prompt-section">
+                    <h3>💬 Master Prompt</h3>
+                    <textarea id="masterPrompt" class="master-prompt-input" rows="6" 
+                        placeholder="Enter your detailed prompt here...">Create a high-end editorial image for an Instagram Reel cover...</textarea>
+                    
+                    <div class="negative-prompts">
+                        <h4>🚫 Negative Prompts (comma-separated)</h4>
+                        <textarea id="negativePrompts" class="negative-prompt-input" rows="3" 
+                            placeholder="mystical clichés, chakra symbols, aura glow...">mystical clichés, chakra symbols, aura glow, smoke</textarea>
+                    </div>
+                </div>
+
+                <!-- Reference Images Assignment -->
+                <div class="reference-images-section">
+                    <h3>🖼️ Reference Images</h3>
+                    <div id="referenceImagesList" class="reference-images-list">
+                        <!-- Will be populated with uploaded images -->
+                    </div>
+                </div>
+
+                <!-- Parameters Section -->
+                <div class="parameters-section">
+                    <h3>⚙️ Generation Parameters</h3>
+                    
+                    <div class="param-tabs">
+                        <button class="param-tab active" data-tab="composition">Composition</button>
+                        <button class="param-tab" data-tab="style">Style</button>
+                        <button class="param-tab" data-tab="technical">Technical</button>
+                        <button class="param-tab" data-tab="output">Output</button>
+                    </div>
+
+                    <!-- Composition Tab -->
+                    <div class="param-content active" id="composition-tab">
+                        <div class="param-grid">
+                            <div class="param-item">
+                                <label>Framing:</label>
+                                <select id="framing">
+                                    <option value="medium_close_up">Medium Close Up</option>
+                                    <option value="close_up">Close Up</option>
+                                    <option value="wide_shot">Wide Shot</option>
+                                    <option value="full_body">Full Body</option>
+                                </select>
+                            </div>
+                            <div class="param-item">
+                                <label>Perspective:</label>
+                                <select id="perspective">
+                                    <option value="eye_level">Eye Level</option>
+                                    <option value="low_angle">Low Angle</option>
+                                    <option value="high_angle">High Angle</option>
+                                </select>
+                            </div>
+                            <div class="param-item">
+                                <label>Subject Placement:</label>
+                                <select id="subjectPlacement">
+                                    <option value="centered">Centered</option>
+                                    <option value="left">Left</option>
+                                    <option value="right">Right</option>
+                                </select>
+                            </div>
+                            <div class="param-item">
+                                <label>Background:</label>
+                                <input type="text" id="background" value="minimal, clean, dark-neutral">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Style Tab -->
+                    <div class="param-content" id="style-tab">
+                        <div class="param-grid">
+                            <div class="param-item">
+                                <label>Genre:</label>
+                                <input type="text" id="genre" value="editorial cinematic portrait">
+                            </div>
+                            <div class="param-item">
+                                <label>Mood:</label>
+                                <input type="text" id="mood" value="grounded, intense, calm authority">
+                            </div>
+                            <div class="param-item">
+                                <label>Color Grading:</label>
+                                <input type="text" id="colorGrading" value="neutral, low saturation, premium contrast">
+                            </div>
+                            <div class="param-item">
+                                <label>Texture:</label>
+                                <input type="text" id="texture" value="real skin texture, natural pores">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Technical Tab -->
+                    <div class="param-content" id="technical-tab">
+                        <div class="param-grid">
+                            <div class="param-item">
+                                <label>Camera Look:</label>
+                                <select id="cameraLook">
+                                    <option value="cinema_dslr">Cinema DSLR</option>
+                                    <option value="film_camera">Film Camera</option>
+                                    <option value="digital">Digital</option>
+                                </select>
+                            </div>
+                            <div class="param-item">
+                                <label>Focal Length:</label>
+                                <select id="focalLength">
+                                    <option value="50mm_portrait">50mm Portrait</option>
+                                    <option value="85mm">85mm</option>
+                                    <option value="35mm">35mm</option>
+                                </select>
+                            </div>
+                            <div class="param-item">
+                                <label>Aperture:</label>
+                                <select id="aperture">
+                                    <option value="f/4.0">f/4.0</option>
+                                    <option value="f/2.8">f/2.8</option>
+                                    <option value="f/1.8">f/1.8</option>
+                                </select>
+                            </div>
+                            <div class="param-item">
+                                <label>Lighting Type:</label>
+                                <select id="lightingType">
+                                    <option value="studio">Studio</option>
+                                    <option value="natural">Natural</option>
+                                    <option value="mixed">Mixed</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Output Tab -->
+                    <div class="param-content" id="output-tab">
+                        <div class="param-grid">
+                            <div class="param-item">
+                                <label>Aspect Ratio:</label>
+                                <select id="aspectRatio">
+                                    <option value="9:16">9:16 (Instagram Reels)</option>
+                                    <option value="1:1">1:1 (Square)</option>
+                                    <option value="16:9">16:9 (Landscape)</option>
+                                    <option value="4:5">4:5 (Instagram Post)</option>
+                                </select>
+                            </div>
+                            <div class="param-item">
+                                <label>Width:</label>
+                                <input type="number" id="outputWidth" value="2160">
+                            </div>
+                            <div class="param-item">
+                                <label>Height:</label>
+                                <input type="number" id="outputHeight" value="3840">
+                            </div>
+                            <div class="param-item">
+                                <label>Format:</label>
+                                <select id="outputFormat">
+                                    <option value="png">PNG</option>
+                                    <option value="jpg">JPG</option>
+                                    <option value="webp">WebP</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- JSON Preview -->
+                <div class="json-preview-section">
+                    <h3>📋 JSON Preview</h3>
+                    <button class="btn-secondary" id="generateJsonBtn">Generate JSON</button>
+                    <pre id="jsonPreview" class="json-preview"></pre>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="launch-actions">
+                    <button class="btn-primary btn-large" id="sendToGoogleBtn">
+                        🚀 Send to Google API
+                    </button>
+                    <button class="btn-secondary" id="downloadJsonBtn">
+                        💾 Download JSON
+                    </button>
+                </div>
+
+                <!-- Response Section -->
+                <div class="response-section" id="responseSection" style="display: none;">
+                    <h3>✨ Generated Result</h3>
+                    <div id="responseContent" class="response-content"></div>
+                    <button class="btn-primary" id="downloadResultBtn">Download Result</button>
+                </div>
             </div>
         </section>
 

@@ -460,6 +460,11 @@ function addImageToGallery(imageData) {
     });
     
     elements.gallery.appendChild(galleryItem);
+    
+    // Update launch button visibility
+    if (window.updateLaunchButtonVisibility) {
+        window.updateLaunchButtonVisibility();
+    }
 }
 
 /**
@@ -601,6 +606,417 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
 } else {
     init();
+}
+
+// ===================================
+// LAUNCH MODE Functionality
+// ===================================
+
+/**
+ * Launch Mode State
+ */
+const launchModeState = {
+    apiKey: null,
+    referenceImages: [],
+    currentJSON: null
+};
+
+/**
+ * Initialize Launch Mode
+ */
+function initLaunchMode() {
+    const launchModeBtn = document.getElementById('launchModeBtn');
+    const backToGalleryBtn = document.getElementById('backToGalleryBtn');
+    const setApiKeyBtn = document.getElementById('setApiKeyBtn');
+    const generateJsonBtn = document.getElementById('generateJsonBtn');
+    const sendToGoogleBtn = document.getElementById('sendToGoogleBtn');
+    const downloadJsonBtn = document.getElementById('downloadJsonBtn');
+    const downloadResultBtn = document.getElementById('downloadResultBtn');
+
+    // Show/hide launch mode button based on images
+    function updateLaunchButtonVisibility() {
+        if (state.images.length > 0) {
+            launchModeBtn.style.display = 'block';
+        } else {
+            launchModeBtn.style.display = 'none';
+        }
+    }
+
+    // Toggle between gallery and launch mode
+    launchModeBtn.addEventListener('click', () => {
+        document.getElementById('gallerySection').style.display = 'none';
+        document.getElementById('launchModeSection').style.display = 'block';
+        populateReferenceImages();
+    });
+
+    backToGalleryBtn.addEventListener('click', () => {
+        document.getElementById('launchModeSection').style.display = 'none';
+        document.getElementById('gallerySection').style.display = 'block';
+    });
+
+    // API Key handling
+    setApiKeyBtn.addEventListener('click', () => {
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const apiKey = apiKeyInput.value.trim();
+
+        if (!apiKey) {
+            showToast('Please enter an API key', 'error');
+            return;
+        }
+
+        // Store API key in memory only (never persisted)
+        launchModeState.apiKey = apiKey;
+
+        // Hide API key section, show main interface
+        document.getElementById('apiKeySection').style.display = 'none';
+        document.getElementById('launchInterface').style.display = 'block';
+
+        // Clear input for security
+        apiKeyInput.value = '';
+
+        showToast('API Key set successfully! (stored in memory only)', 'success');
+    });
+
+    // Parameter tabs
+    const paramTabs = document.querySelectorAll('.param-tab');
+    paramTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            // Remove active from all tabs and contents
+            paramTabs.forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.param-content').forEach(c => c.classList.remove('active'));
+
+            // Add active to clicked tab and its content
+            tab.classList.add('active');
+            const tabName = tab.dataset.tab;
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+        });
+    });
+
+    // Generate JSON
+    generateJsonBtn.addEventListener('click', () => {
+        const json = generateJSON();
+        launchModeState.currentJSON = json;
+        document.getElementById('jsonPreview').textContent = JSON.stringify(json, null, 2);
+        showToast('JSON generated successfully!', 'success');
+    });
+
+    // Send to Google API
+    sendToGoogleBtn.addEventListener('click', async () => {
+        if (!launchModeState.apiKey) {
+            showToast('Please set your API key first', 'error');
+            return;
+        }
+
+        if (!launchModeState.currentJSON) {
+            showToast('Please generate JSON first', 'error');
+            return;
+        }
+
+        await sendToGoogleAPI();
+    });
+
+    // Download JSON
+    downloadJsonBtn.addEventListener('click', () => {
+        if (!launchModeState.currentJSON) {
+            showToast('Please generate JSON first', 'error');
+            return;
+        }
+
+        downloadJSON(launchModeState.currentJSON);
+    });
+
+    // Download result
+    downloadResultBtn.addEventListener('click', () => {
+        // Will be implemented based on API response
+        showToast('Download functionality will be available after generation', 'success');
+    });
+
+    // Call this when images are added/removed
+    window.updateLaunchButtonVisibility = updateLaunchButtonVisibility;
+}
+
+/**
+ * Populate Reference Images
+ */
+function populateReferenceImages() {
+    const container = document.getElementById('referenceImagesList');
+    container.innerHTML = '';
+
+    launchModeState.referenceImages = [];
+
+    state.images.forEach((image, index) => {
+        const card = document.createElement('div');
+        card.className = 'reference-image-card';
+
+        card.innerHTML = `
+            <img src="${image.preview}" alt="${image.name}" class="reference-image-preview">
+            <div class="reference-image-controls">
+                <div>
+                    <label>Type:</label>
+                    <select class="ref-type" data-index="${index}">
+                        <option value="identity" ${index === 0 ? 'selected' : ''}>Identity</option>
+                        <option value="style" ${index === 1 ? 'selected' : ''}>Style</option>
+                        <option value="composition">Composition</option>
+                        <option value="reference">Reference</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Weight (0.0-1.0):</label>
+                    <input type="number" class="ref-weight" data-index="${index}" 
+                           min="0" max="1" step="0.05" value="${index === 0 ? '0.9' : '0.45'}">
+                </div>
+                <div>
+                    <label>Lock Features (comma-separated):</label>
+                    <input type="text" class="ref-lock" data-index="${index}" 
+                           value="${index === 0 ? 'face, facial_proportions, skin_tone' : 'lighting_mood, color_palette'}"
+                           placeholder="e.g., face, lighting">
+                </div>
+            </div>
+        `;
+
+        container.appendChild(card);
+
+        // Store reference
+        launchModeState.referenceImages.push({
+            id: `ref_${index + 1}`,
+            image: image,
+            type: index === 0 ? 'identity' : 'style',
+            weight: index === 0 ? 0.9 : 0.45,
+            lock: []
+        });
+    });
+
+    // Add event listeners for updates
+    document.querySelectorAll('.ref-type').forEach(el => {
+        el.addEventListener('change', updateReferenceImage);
+    });
+    document.querySelectorAll('.ref-weight').forEach(el => {
+        el.addEventListener('input', updateReferenceImage);
+    });
+    document.querySelectorAll('.ref-lock').forEach(el => {
+        el.addEventListener('input', updateReferenceImage);
+    });
+}
+
+/**
+ * Update Reference Image Settings
+ */
+function updateReferenceImage(event) {
+    const index = parseInt(event.target.dataset.index);
+    const ref = launchModeState.referenceImages[index];
+
+    if (event.target.classList.contains('ref-type')) {
+        ref.type = event.target.value;
+    } else if (event.target.classList.contains('ref-weight')) {
+        ref.weight = parseFloat(event.target.value);
+    } else if (event.target.classList.contains('ref-lock')) {
+        const lockText = event.target.value;
+        ref.lock = lockText.split(',').map(s => s.trim()).filter(s => s);
+    }
+}
+
+/**
+ * Generate JSON Payload
+ */
+function generateJSON() {
+    // Get all form values
+    const masterPrompt = document.getElementById('masterPrompt').value;
+    const negativePrompts = document.getElementById('negativePrompts').value
+        .split(',').map(s => s.trim()).filter(s => s);
+
+    // Reference images
+    const referenceImages = launchModeState.referenceImages.map((ref, index) => ({
+        id: ref.id,
+        type: ref.type,
+        image_base64: ref.image.base64,
+        weight: ref.weight,
+        lock: ref.lock.length > 0 ? ref.lock : undefined
+    }));
+
+    // Composition
+    const composition = {
+        framing: document.getElementById('framing').value,
+        perspective: document.getElementById('perspective').value,
+        subject_placement: document.getElementById('subjectPlacement').value,
+        background: document.getElementById('background').value,
+        rule_of_thirds: false
+    };
+
+    // Style
+    const styleParameters = {
+        genre: document.getElementById('genre').value,
+        mood: document.getElementById('mood').value,
+        color_grading: document.getElementById('colorGrading').value,
+        texture: document.getElementById('texture').value
+    };
+
+    // Technical
+    const technicalSpecifications = {
+        camera: {
+            look: document.getElementById('cameraLook').value,
+            focal_length: document.getElementById('focalLength').value,
+            aperture: document.getElementById('aperture').value,
+            depth_of_field: "soft background separation"
+        },
+        lighting: {
+            type: document.getElementById('lightingType').value,
+            setup: "soft directional key light",
+            direction: "three-quarter",
+            color_temperature: "neutral-warm"
+        },
+        quality: {
+            detail: "ultra-high",
+            realism: "very high"
+        }
+    };
+
+    // Output
+    const aspectRatio = document.getElementById('aspectRatio').value;
+    const outputWidth = parseInt(document.getElementById('outputWidth').value);
+    const outputHeight = parseInt(document.getElementById('outputHeight').value);
+    const outputFormat = document.getElementById('outputFormat').value;
+
+    const outputSettings = {
+        aspect_ratio: aspectRatio,
+        resolution: {
+            width: outputWidth,
+            height: outputHeight
+        },
+        format: outputFormat,
+        deliverables: ["generated_image"]
+    };
+
+    // Build complete JSON
+    const json = {
+        model: "nano-banana-pro",
+        consistency_id: `generation_${Date.now()}`,
+        prompt: {
+            text: masterPrompt,
+            language: "en",
+            negative: negativePrompts
+        },
+        reference_images: referenceImages,
+        composition: composition,
+        style_parameters: styleParameters,
+        technical_specifications: technicalSpecifications,
+        output_settings: outputSettings
+    };
+
+    return json;
+}
+
+/**
+ * Send to Google API
+ */
+async function sendToGoogleAPI() {
+    showLoading();
+    document.getElementById('loadingOverlay').querySelector('.loading-text').textContent = 'Sending to Google API...';
+
+    try {
+        // NOTE: Update this URL with the actual Google API endpoint
+        const apiEndpoint = 'https://generativelanguage.googleapis.com/v1beta/models/nano-banana-pro:generate';
+        
+        const response = await axios.post(apiEndpoint, launchModeState.currentJSON, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${launchModeState.apiKey}`
+            },
+            timeout: 60000  // 60 second timeout
+        });
+
+        hideLoading();
+
+        // Display response
+        displayAPIResponse(response.data);
+        showToast('Image generated successfully!', 'success');
+
+    } catch (error) {
+        hideLoading();
+        console.error('API Error:', error);
+
+        let errorMessage = 'Failed to generate image. ';
+        if (error.response) {
+            errorMessage += `Status: ${error.response.status}. ${error.response.data?.error?.message || ''}`;
+        } else if (error.request) {
+            errorMessage += 'No response from server. Check your API key and internet connection.';
+        } else {
+            errorMessage += error.message;
+        }
+
+        showToast(errorMessage, 'error');
+
+        // Show mock response for testing
+        if (confirm('API call failed. Would you like to see a mock response for testing?')) {
+            displayMockResponse();
+        }
+    }
+}
+
+/**
+ * Display API Response
+ */
+function displayAPIResponse(data) {
+    const responseSection = document.getElementById('responseSection');
+    const responseContent = document.getElementById('responseContent');
+
+    // Check if response contains an image
+    if (data.image_base64) {
+        responseContent.innerHTML = `
+            <img src="${data.image_base64}" alt="Generated Image" class="response-image">
+            <p>Generation ID: ${data.generation_id || 'N/A'}</p>
+        `;
+    } else if (data.image_url) {
+        responseContent.innerHTML = `
+            <img src="${data.image_url}" alt="Generated Image" class="response-image">
+            <p>Generation ID: ${data.generation_id || 'N/A'}</p>
+        `;
+    } else {
+        responseContent.innerHTML = `
+            <pre class="json-preview">${JSON.stringify(data, null, 2)}</pre>
+        `;
+    }
+
+    responseSection.style.display = 'block';
+    responseSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+/**
+ * Display Mock Response (for testing)
+ */
+function displayMockResponse() {
+    const mockData = {
+        generation_id: 'mock_' + Date.now(),
+        status: 'completed',
+        message: 'This is a mock response for testing purposes.',
+        image_base64: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgZmlsbD0iIzY2N2VlYSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjQwIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlRFU1QgR0VORVJBVEVEIFJFU1VMVC0gTU9DSyBJTUFHRTwvdGV4dD48L3N2Zz4='
+    };
+
+    displayAPIResponse(mockData);
+}
+
+/**
+ * Download JSON
+ */
+function downloadJSON(json) {
+    const jsonString = JSON.stringify(json, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nano-banana-generation-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showToast('JSON downloaded successfully!', 'success');
+}
+
+// Initialize Launch Mode when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initLaunchMode);
+} else {
+    initLaunchMode();
 }
 
 // Export for testing (if needed)
