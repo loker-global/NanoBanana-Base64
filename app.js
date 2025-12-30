@@ -692,6 +692,13 @@ function initLaunchMode() {
             launchModeState.apiKey = apiKey;
             launchModeState.categorizedModels = validation.categorizedModels;
 
+            // Set default Nano Banana endpoint if not already set
+            const nanoBananaEndpointInput = document.getElementById('nanoBananaEndpoint');
+            if (nanoBananaEndpointInput && !nanoBananaEndpointInput.value.trim()) {
+                nanoBananaEndpointInput.value = 'https://api.nanobanana.ai/v1/generate';
+                console.log('🍌 Set default Nano Banana endpoint');
+            }
+
             hideLoading();
             setApiKeyBtn.disabled = false;
             setApiKeyBtn.textContent = 'Set API Key';
@@ -905,6 +912,24 @@ function addModelSelectorToInterface(categorizedModels) {
         const outputLimit = model.outputTokenLimit ? `${model.outputTokenLimit.toLocaleString()} tokens` : 'Not specified';
         const methods = model.supportedGenerationMethods ? model.supportedGenerationMethods.join(', ') : 'Not specified';
         
+        // Check if this is a Nano Banana model
+        const displayName = (model.displayName || '').toLowerCase();
+        const modelName = (model.name || '').toLowerCase();
+        const isNanoBanana = modelName.includes('nano') || 
+                           modelName.includes('banana') ||
+                           displayName.includes('nano') ||
+                           displayName.includes('banana');
+        
+        let specialEndpointInfo = '';
+        if (isNanoBanana) {
+            specialEndpointInfo = `
+                <div class="nano-banana-info">
+                    <p><strong>🍌 Official Google API:</strong> <code>https://generativelanguage.googleapis.com/v1beta/${model.name}:generateContent</code></p>
+                    <p><em>This Nano Banana model uses Google's official API with image generation capabilities</em></p>
+                </div>
+            `;
+        }
+        
         modelInfo.innerHTML = `
             <div class="model-details">
                 <p><strong>Description:</strong> ${model.description || 'No description available'}</p>
@@ -912,6 +937,7 @@ function addModelSelectorToInterface(categorizedModels) {
                 <p><strong>Output Limit:</strong> ${outputLimit}</p>
                 <p><strong>Methods:</strong> ${methods}</p>
                 <p><strong>Version:</strong> ${model.version}</p>
+                ${specialEndpointInfo}
             </div>
         `;
     }
@@ -1222,37 +1248,52 @@ async function sendToGoogleAPI() {
     try {
         // Get selected model and generation type
         const generationType = document.getElementById('generationType')?.value || 'text';
-        const selectedModelName = document.getElementById('selectedModel')?.value;
+        const modelSelect = document.getElementById('selectedModel');
+        const selectedOption = modelSelect?.options[modelSelect.selectedIndex];
         
-        if (!selectedModelName) {
+        if (!selectedOption || !selectedOption.dataset.fullModel) {
             throw new Error('Please select a model first');
         }
+        
+        // Parse the full model data to get the correct model name
+        const fullModel = JSON.parse(selectedOption.dataset.fullModel);
+        const selectedModelName = fullModel.name.replace('models/', '');
         
         console.log('🚀 Sending request to API...');
         console.log('Generation type:', generationType);
         console.log('Selected model:', selectedModelName);
+        console.log('Full model name:', fullModel.name);
         console.log('API Key length:', launchModeState.apiKey?.length);
         
         // Determine actual API call type
         let actualGenerationType = generationType;
         
-        // For "all" option, determine the type based on the model name
+        // For "all" option, determine the type based on the model name and supported methods
         if (generationType === 'all') {
             const modelNameLower = selectedModelName.toLowerCase();
-            if (modelNameLower.includes('imagen') || modelNameLower.includes('veo')) {
-                actualGenerationType = 'image';
-            } else {
-                actualGenerationType = 'text'; // Default to text for custom models like Nano Banana
-            }
-            console.log(`🔍 Auto-detected generation type for ${selectedModelName}: ${actualGenerationType}`);
+            const displayNameLower = (fullModel.displayName || '').toLowerCase();
+            const supportedMethods = fullModel.supportedGenerationMethods || [];
+            
+            // Check if it's an image generation model based on methods, name, or display name
+            const isImageModel = modelNameLower.includes('imagen') || 
+                               modelNameLower.includes('veo') || 
+                               modelNameLower.includes('nano') || 
+                               modelNameLower.includes('banana') ||
+                               displayNameLower.includes('nano') ||
+                               displayNameLower.includes('banana') ||
+                               supportedMethods.includes('predict') ||
+                               supportedMethods.includes('predictLongRunning');
+            
+            actualGenerationType = isImageModel ? 'image' : 'text';
+            console.log(`🔍 Auto-detected generation type for ${selectedModelName} (${fullModel.displayName}): ${actualGenerationType}`);
         }
         
         if (actualGenerationType === 'image') {
             document.getElementById('loadingOverlay').querySelector('.loading-text').textContent = 'Generating image...';
-            await handleImageGeneration(selectedModelName);
+            await handleImageGeneration(selectedModelName, fullModel);
         } else {
             document.getElementById('loadingOverlay').querySelector('.loading-text').textContent = 'Enhancing prompt...';
-            await handleTextGeneration(selectedModelName);
+            await handleTextGeneration(selectedModelName, fullModel);
         }
 
     } catch (error) {
@@ -1288,15 +1329,15 @@ async function sendToGoogleAPI() {
 /**
  * Handle Text Generation (Prompt Enhancement)
  */
-async function handleTextGeneration(selectedModelName) {
+async function handleTextGeneration(selectedModelName, fullModel) {
     console.log('Current JSON exists:', !!launchModeState.currentJSON);
     
     if (!launchModeState.currentJSON) {
         throw new Error('Please generate JSON first');
     }
     
-    // Build API endpoint
-    const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModelName}:generateContent?key=${launchModeState.apiKey}`;
+    // Build API endpoint using the full model name
+    const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/${fullModel.name}:generateContent?key=${launchModeState.apiKey}`;
     console.log('Endpoint:', apiEndpoint.replace(launchModeState.apiKey, 'API_KEY_HIDDEN'));
     
     // Transform our JSON to Gemini API format
@@ -1361,79 +1402,185 @@ async function handleTextGeneration(selectedModelName) {
 /**
  * Handle Image Generation
  */
-async function handleImageGeneration(selectedModelName) {
-    // Check if this is a Nano Banana model
+async function handleImageGeneration(selectedModelName, fullModel) {
+    // Check if this is a Nano Banana model by checking both technical name and display name
+    const displayName = (fullModel.displayName || '').toLowerCase();
     const isNanoBanana = selectedModelName.toLowerCase().includes('nano') || 
-                        selectedModelName.toLowerCase().includes('banana');
+                        selectedModelName.toLowerCase().includes('banana') ||
+                        displayName.includes('nano') ||
+                        displayName.includes('banana');
+    
+    console.log('🔍 Image generation detection:');
+    console.log('  - Selected model name:', selectedModelName);
+    console.log('  - Display name:', fullModel.displayName);
+    console.log('  - Is Nano Banana:', isNanoBanana);
     
     if (isNanoBanana) {
-        // Use Nano Banana API with full JSON payload
-        await handleNanoBananaGeneration(selectedModelName);
+        console.log('🍌 Using Google API with Nano Banana model (official endpoint)');
+        // Nano Banana models use the official Google API with proper model name
+        await handleNanoBananaGeneration(selectedModelName, fullModel);
     } else {
+        console.log('🔮 Using standard Gemini image generation API');
         // Use standard Gemini image generation
-        await handleGeminiImageGeneration(selectedModelName);
+        await handleGeminiImageGeneration(selectedModelName, fullModel);
     }
 }
 
 /**
- * Handle Nano Banana Image Generation
+ * Handle Nano Banana Image Generation (Using Official Google API)
  */
-async function handleNanoBananaGeneration(selectedModelName) {
-    console.log('Using Nano Banana API for image generation');
+async function handleNanoBananaGeneration(selectedModelName, fullModel) {
+    console.log('🍌 Using Official Google API for Nano Banana image generation');
+    console.log('  - Technical model name:', selectedModelName);
+    console.log('  - Display name:', fullModel.displayName);
+    console.log('  - Full model name:', fullModel.name);
     
     if (!launchModeState.currentJSON) {
         throw new Error('Please generate JSON first');
     }
     
-    // Get Nano Banana API endpoint (user configurable)
-    const nanoBananaEndpoint = document.getElementById('nanoBananaEndpoint')?.value || 
-                               'https://api.nanobanana.ai/v1/generate';
+    // 1. OFFICIAL GOOGLE ENDPOINT
+    // "Nano Banana" = gemini-3-pro-image-preview (example) 
+    // Uses: https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${apiKey}
+    const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/${fullModel.name}:generateContent?key=${launchModeState.apiKey}`;
+    console.log('🌐 Using Official Google API endpoint:', apiEndpoint.replace(launchModeState.apiKey, 'API_KEY_HIDDEN'));
     
-    console.log('Nano Banana endpoint:', nanoBananaEndpoint);
+    // Get the master prompt for image generation
+    const masterPrompt = document.getElementById('masterPrompt')?.value || 'Generate a beautiful image';
     
-    // Use the full JSON payload with reference images
-    const payload = {
-        ...launchModeState.currentJSON,
-        model: selectedModelName
+    // Format the prompt using the JSON data
+    const jsonData = launchModeState.currentJSON;
+    let enhancedPrompt = masterPrompt;
+    
+    // Enhance prompt with reference image context if available
+    if (jsonData.reference_images && jsonData.reference_images.length > 0) {
+        enhancedPrompt += `\n\nReference images provided: ${jsonData.reference_images.length} images`;
+        enhancedPrompt += `\nPlease generate an image that incorporates elements or style from the reference images.`;
+    }
+    
+    // Add any additional context from the JSON
+    if (jsonData.prompt) {
+        let promptText = '';
+        if (typeof jsonData.prompt === 'string') {
+            promptText = jsonData.prompt;
+        } else if (typeof jsonData.prompt === 'object') {
+            // If it's an object, try to extract meaningful text
+            if (jsonData.prompt.text) {
+                promptText = jsonData.prompt.text;
+            } else {
+                promptText = JSON.stringify(jsonData.prompt, null, 2);
+            }
+        } else {
+            promptText = String(jsonData.prompt);
+        }
+        enhancedPrompt += `\n\nAdditional context: ${promptText}`;
+    }
+    
+    console.log('📤 Sending request to Google API:');
+    console.log('  - Model:', fullModel.name);
+    console.log('  - Enhanced prompt length:', enhancedPrompt.length);
+    console.log('  - Reference images:', jsonData.reference_images?.length || 0);
+    console.log('  - JSON prompt type:', typeof jsonData.prompt);
+    console.log('  - JSON prompt value:', jsonData.prompt);
+    console.log('  - Final enhanced prompt:', enhancedPrompt.substring(0, 200) + '...');
+    
+    // For Google API, we need to format the request properly but include reference images
+    const requestPayload = {
+        contents: [{
+            parts: [{
+                text: enhancedPrompt
+            }]
+        }],
+        generationConfig: {
+            temperature: 0.8,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 8192,
+        }
     };
     
-    console.log('Sending full JSON payload to Nano Banana with', 
-                payload.reference_images?.length || 0, 'reference images');
+    // Add reference images to the Google API format
+    if (jsonData.reference_images && jsonData.reference_images.length > 0) {
+        const validImages = jsonData.reference_images.filter(imgData => imgData && imgData.image_base64);
+        
+        if (validImages.length > 0) {
+            requestPayload.contents[0].parts = [
+                { text: enhancedPrompt },
+                ...validImages.map(imgData => {
+                    // Properly detect MIME type from base64 data or default to jpeg
+                    let mimeType = 'image/jpeg'; // default
+                    const base64Data = imgData.image_base64;
+                    
+                    if (base64Data.startsWith('data:image/')) {
+                        // Extract MIME type from data URI
+                        const mimeMatch = base64Data.match(/data:([^;]+)/);
+                        if (mimeMatch) {
+                            mimeType = mimeMatch[1];
+                        }
+                    } else if (imgData.type && imgData.type.startsWith('image/')) {
+                        // Use type if it's a proper MIME type
+                        mimeType = imgData.type;
+                    }
+                    
+                    console.log(`📷 Processing image with MIME type: ${mimeType}`);
+                    
+                    return {
+                        inlineData: {
+                            mimeType: mimeType,
+                            data: base64Data.replace(/^data:image\/[^;]+;base64,/, '')
+                        }
+                    };
+                })
+            ];
+            console.log(`📷 Added ${validImages.length} reference images to Google API request`);
+        } else {
+            console.warn('⚠️ No valid reference images found');
+        }
+    }
     
-    const response = await axios.post(nanoBananaEndpoint, payload, {
+    const response = await axios.post(apiEndpoint, requestPayload, {
         headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${launchModeState.apiKey}`
+            'Content-Type': 'application/json'
         },
         timeout: 120000 // 2 minutes for image generation
     });
     
-    console.log(`✅ Nano Banana image generation successful with model: ${selectedModelName}`);
+    console.log(`✅ Google API call successful with Nano Banana model: ${fullModel.name}`);
     
-    // Handle Nano Banana response before hiding loading
-    if (response.data?.image_base64) {
-        hideLoading();
-        displayGeneratedImage(response.data.image_base64, 'base64', selectedModelName);
-        showToast('Image generated successfully!', 'success');
-    } else if (response.data?.image_url) {
-        hideLoading();
-        displayGeneratedImage(response.data.image_url, 'url', selectedModelName);
-        showToast('Image generated successfully!', 'success');
-    } else if (response.data?.result) {
-        hideLoading();
-        // Alternative response format
-        displayAPIResponse(response.data);
-        showToast('Generation completed!', 'success');
+    // Handle Google API response
+    const candidates = response.data?.candidates;
+    if (candidates && candidates.length > 0) {
+        const candidate = candidates[0];
+        
+        // Check for generated text (could contain image data or description)
+        if (candidate.content?.parts?.[0]?.text) {
+            hideLoading();
+            displayGeminiResponse(candidate.content.parts[0].text);
+            showToast('Content generated successfully!', 'success');
+        }
+        // Check for inline image data (if model supports it)
+        else if (candidate.content?.parts?.[0]?.inlineData) {
+            hideLoading();
+            const imageData = candidate.content.parts[0].inlineData;
+            displayGeneratedImage(imageData.data, 'base64', fullModel.displayName || selectedModelName);
+            showToast('Image generated successfully!', 'success');
+        }
+        else {
+            hideLoading();
+            displayAPIResponse(response.data);
+            showToast('Generation completed!', 'success');
+        }
     } else {
         hideLoading();
-        throw new Error('Unexpected response format from Nano Banana API');
+        console.error('Unexpected Google API response:', response.data);
+        throw new Error('No content generated from Google API');
     }
 }
 
 /**
  * Handle Gemini Image Generation
  */
-async function handleGeminiImageGeneration(selectedModelName) {
+async function handleGeminiImageGeneration(selectedModelName, fullModel) {
     // Get the master prompt for image generation
     const masterPrompt = document.getElementById('masterPrompt')?.value || 'A beautiful image';
     
@@ -1444,7 +1591,7 @@ async function handleGeminiImageGeneration(selectedModelName) {
     console.log('Gemini image generation with enhanced prompt');
     
     // For Gemini models with image generation capability, use generateContent endpoint
-    const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModelName}:generateContent?key=${launchModeState.apiKey}`;
+    const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/${fullModel.name}:generateContent?key=${launchModeState.apiKey}`;
     console.log('Endpoint:', apiEndpoint.replace(launchModeState.apiKey, 'API_KEY_HIDDEN'));
     
     // Request structure for image generation

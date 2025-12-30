@@ -1440,6 +1440,32 @@ body {
     color: var(--primary-color);
 }
 
+/* Nano Banana Official Google API Info */
+.nano-banana-info {
+    background: rgba(255, 215, 0, 0.1);
+    border: 2px solid var(--primary-color);
+    border-radius: 10px;
+    padding: 12px;
+    margin-top: 10px;
+}
+
+.nano-banana-info code {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 0.85em;
+    color: var(--text-light);
+    word-break: break-all;
+}
+
+.nano-banana-info em {
+    color: #FFD700;
+    font-size: 0.9rem;
+    display: block;
+    margin-top: 5px;
+}
+
 /* ===================================
    Image Response Styling
    =================================== */
