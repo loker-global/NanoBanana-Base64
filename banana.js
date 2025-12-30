@@ -33,6 +33,14 @@ const state = {
         seed: null,
         variations: 1
     },
+    compressionSettings: {
+        enabled: true,
+        quality: 0.7,  // 70% quality for compression
+        maxWidth: 1024,  // Max dimensions for reference images
+        maxHeight: 1024,
+        convertPngToJpeg: true,  // Always convert PNG to JPEG for better compression
+        targetMaxSize: 100000  // Target max size in bytes (100KB) - spirit of the project!
+    },
     generationHistory: []
 };
 
@@ -260,23 +268,70 @@ function processFiles(files) {
 }
 
 /**
- * Process Single Image
+ * Process Single Image - WITH COMPRESSION (spirit of NanoBanana!)
  */
 function processImage(file) {
+    // Check file size before processing
+    const maxFileSize = 50 * 1024 * 1024; // 50MB limit for input files
+    if (file.size > maxFileSize) {
+        showToast(`File too large: ${file.name} (${formatFileSize(file.size)}). Maximum input size is 50MB.`, 'error');
+        return;
+    }
+    
     const reader = new FileReader();
     
-    reader.onload = (e) => {
-        const imageData = {
-            id: Date.now() + '_' + Math.random().toString(36).substring(2, 11),
-            name: file.name,
-            size: formatFileSize(file.size),
-            base64: e.target.result,
-            preview: e.target.result
-        };
-        
-        state.referenceImages.push(imageData);
-        addImageToGallery(imageData);
-        updateCostEstimate();
+    reader.onload = async (e) => {
+        // Compress images following the NanoBanana spirit!
+        if (state.compressionSettings.enabled) {
+            try {
+                const compressedData = await compressImage(e.target.result, file.type);
+                const originalSize = file.size;
+                const compressedSize = Math.round((compressedData.length * 3) / 4); // Approximate Base64 to bytes
+                
+                // Show warning if still too large
+                if (compressedSize > state.compressionSettings.targetMaxSize) {
+                    showToast(`Info: ${file.name} compressed to ${formatFileSize(compressedSize)} (target: ${formatFileSize(state.compressionSettings.targetMaxSize)})`, 'warning');
+                }
+                
+                const imageData = {
+                    id: Date.now() + '_' + Math.random().toString(36).substring(2, 11),
+                    name: file.name,
+                    size: formatFileSize(compressedSize),
+                    originalSize: formatFileSize(originalSize),
+                    compressionRatio: ((1 - compressedSize / originalSize) * 100).toFixed(1),
+                    base64: compressedData,
+                    preview: compressedData
+                };
+                
+                state.referenceImages.push(imageData);
+                addImageToGallery(imageData);
+                updateCostEstimate();
+                
+                console.log(`🍌 Compressed ${file.name}: ${formatFileSize(originalSize)} → ${formatFileSize(compressedSize)} (-${imageData.compressionRatio}%)`);
+            } catch (error) {
+                console.error('Compression failed:', error);
+                showToast(`Compression failed for: ${file.name}. Please try a smaller image.`, 'error');
+            }
+        } else {
+            // No compression - warn about large files
+            if (file.size > state.compressionSettings.targetMaxSize) {
+                showToast(`Warning: ${file.name} is ${formatFileSize(file.size)}. Compression disabled - may cause high costs!`, 'warning');
+            }
+            
+            const imageData = {
+                id: Date.now() + '_' + Math.random().toString(36).substring(2, 11),
+                name: file.name,
+                size: formatFileSize(file.size),
+                originalSize: formatFileSize(file.size),
+                compressionRatio: '0',
+                base64: e.target.result,
+                preview: e.target.result
+            };
+            
+            state.referenceImages.push(imageData);
+            addImageToGallery(imageData);
+            updateCostEstimate();
+        }
     };
     
     reader.onerror = () => {
@@ -287,17 +342,125 @@ function processImage(file) {
 }
 
 /**
- * Add Image to Gallery
+ * Compress Image using Canvas - THE SPIRIT OF NANOBANANA!
+ * Aggressive compression to stay under 100KB per image
+ */
+async function compressImage(dataURL, mimeType) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Start with aggressive dimensions to ensure smaller file size
+            let width = img.width;
+            let height = img.height;
+            let maxWidth = state.compressionSettings.maxWidth;
+            let maxHeight = state.compressionSettings.maxHeight;
+            
+            // First pass: resize to max dimensions
+            if (width > maxWidth || height > maxHeight) {
+                const ratio = Math.min(maxWidth / width, maxHeight / height);
+                width = Math.round(width * ratio);
+                height = Math.round(height * ratio);
+            }
+            
+            // Helper function to get file size from data URL
+            const getDataURLSize = (dataURL) => {
+                const base64 = dataURL.split(',')[1];
+                return Math.round((base64.length * 3) / 4);
+            };
+            
+            // Helper function to compress with specific quality and dimensions
+            const compressWithSettings = (w, h, quality) => {
+                canvas.width = w;
+                canvas.height = h;
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(img, 0, 0, w, h);
+                
+                // Always use JPEG for better compression (NanoBanana spirit!)
+                return canvas.toDataURL('image/jpeg', quality);
+            };
+            
+            let quality = state.compressionSettings.quality;
+            let currentWidth = width;
+            let currentHeight = height;
+            let compressedDataURL = compressWithSettings(currentWidth, currentHeight, quality);
+            let currentSize = getDataURLSize(compressedDataURL);
+            
+            // If still too large, iteratively reduce quality and/or dimensions
+            const targetSize = state.compressionSettings.targetMaxSize;
+            let attempts = 0;
+            const maxAttempts = 10;
+            
+            while (currentSize > targetSize && attempts < maxAttempts) {
+                attempts++;
+                
+                if (attempts % 2 === 1) {
+                    // Odd attempts: reduce quality
+                    quality = Math.max(0.1, quality - 0.1);
+                } else {
+                    // Even attempts: reduce dimensions
+                    const reductionFactor = 0.9;
+                    currentWidth = Math.round(currentWidth * reductionFactor);
+                    currentHeight = Math.round(currentHeight * reductionFactor);
+                    
+                    // Don't go below minimum reasonable dimensions
+                    if (currentWidth < 100 || currentHeight < 100) {
+                        currentWidth = Math.max(100, currentWidth);
+                        currentHeight = Math.max(100, currentHeight);
+                        quality = Math.max(0.1, quality - 0.1);
+                    }
+                }
+                
+                compressedDataURL = compressWithSettings(currentWidth, currentHeight, quality);
+                currentSize = getDataURLSize(compressedDataURL);
+            }
+            
+            // Final check - if still too large, use minimum settings
+            if (currentSize > targetSize) {
+                compressedDataURL = compressWithSettings(
+                    Math.min(400, currentWidth), 
+                    Math.min(400, currentHeight), 
+                    0.1
+                );
+            }
+            
+            resolve(compressedDataURL);
+        };
+        
+        img.onerror = () => {
+            reject(new Error('Failed to load image'));
+        };
+        
+        img.src = dataURL;
+    });
+}
+
+/**
+ * Add Image to Gallery - Show compression savings!
  */
 function addImageToGallery(imageData) {
     const item = document.createElement('div');
     item.className = 'reference-item';
     item.dataset.id = imageData.id;
     
+    // Show compression badge if compressed (spirit of NanoBanana!)
+    const compressionBadge = imageData.compressionRatio && imageData.compressionRatio > 0 
+        ? `<div class="compression-badge">-${imageData.compressionRatio}%</div>` 
+        : '';
+    
+    const sizeInfo = imageData.compressionRatio && imageData.compressionRatio > 0
+        ? `${imageData.size} (was ${imageData.originalSize})`
+        : `${imageData.size}`;
+    
     item.innerHTML = `
         <img src="${imageData.preview}" alt="${imageData.name}">
+        ${compressionBadge}
         <button class="reference-item-remove" data-id="${imageData.id}">×</button>
-        <div class="reference-item-info">${imageData.name}</div>
+        <div class="reference-item-info" title="${imageData.name} - ${sizeInfo}">${imageData.name}</div>
     `;
     
     // Remove button handler

@@ -367,6 +367,20 @@ body {
     display: block;
 }
 
+.compression-badge {
+    position: absolute;
+    top: var(--spacing-xs);
+    left: var(--spacing-xs);
+    background: linear-gradient(135deg, #4CAF50, #45a049);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    box-shadow: var(--shadow-sm);
+    z-index: 2;
+}
+
 .reference-item-remove {
     position: absolute;
     top: var(--spacing-xs);
