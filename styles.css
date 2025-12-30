@@ -53,7 +53,7 @@ body {
 
 @keyframes gradientShift {
     0%, 100% {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
     }
     50% {
         background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);

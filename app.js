@@ -141,7 +141,7 @@ function processImage(file) {
     
     reader.onload = (e) => {
         const imageData = {
-            id: Date.now() + Math.random(),
+            id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
             name: file.name,
             size: formatFileSize(file.size),
             base64: e.target.result,
@@ -315,14 +315,9 @@ document.addEventListener('keydown', (e) => {
 });
 
 /**
- * Prevent page unload if images are loaded (optional safety)
+ * Note: beforeunload protection removed as Base64 conversion is quick
+ * and non-destructive. Users can freely navigate away.
  */
-window.addEventListener('beforeunload', (e) => {
-    if (state.images.length > 0) {
-        e.preventDefault();
-        e.returnValue = 'You have images loaded. Are you sure you want to leave?';
-    }
-});
 
 // Initialize the application when DOM is ready
 if (document.readyState === 'loading') {
