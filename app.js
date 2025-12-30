@@ -1362,27 +1362,100 @@ async function handleTextGeneration(selectedModelName) {
  * Handle Image Generation
  */
 async function handleImageGeneration(selectedModelName) {
+    // Check if this is a Nano Banana model
+    const isNanoBanana = selectedModelName.toLowerCase().includes('nano') || 
+                        selectedModelName.toLowerCase().includes('banana');
+    
+    if (isNanoBanana) {
+        // Use Nano Banana API with full JSON payload
+        await handleNanoBananaGeneration(selectedModelName);
+    } else {
+        // Use standard Gemini image generation
+        await handleGeminiImageGeneration(selectedModelName);
+    }
+}
+
+/**
+ * Handle Nano Banana Image Generation
+ */
+async function handleNanoBananaGeneration(selectedModelName) {
+    console.log('Using Nano Banana API for image generation');
+    
+    if (!launchModeState.currentJSON) {
+        throw new Error('Please generate JSON first');
+    }
+    
+    // Get Nano Banana API endpoint (user configurable)
+    const nanoBananaEndpoint = document.getElementById('nanoBananaEndpoint')?.value || 
+                               'https://api.nanobanana.ai/v1/generate';
+    
+    console.log('Nano Banana endpoint:', nanoBananaEndpoint);
+    
+    // Use the full JSON payload with reference images
+    const payload = {
+        ...launchModeState.currentJSON,
+        model: selectedModelName
+    };
+    
+    console.log('Sending full JSON payload to Nano Banana with', 
+                payload.reference_images?.length || 0, 'reference images');
+    
+    const response = await axios.post(nanoBananaEndpoint, payload, {
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${launchModeState.apiKey}`
+        },
+        timeout: 120000 // 2 minutes for image generation
+    });
+    
+    console.log(`✅ Nano Banana image generation successful with model: ${selectedModelName}`);
+    hideLoading();
+    
+    // Handle Nano Banana response
+    if (response.data?.image_base64) {
+        displayGeneratedImage(response.data.image_base64, 'base64', selectedModelName);
+        showToast('Image generated successfully!', 'success');
+    } else if (response.data?.image_url) {
+        displayGeneratedImage(response.data.image_url, 'url', selectedModelName);
+        showToast('Image generated successfully!', 'success');
+    } else if (response.data?.result) {
+        // Alternative response format
+        displayAPIResponse(response.data);
+        showToast('Generation completed!', 'success');
+    } else {
+        throw new Error('Unexpected response format from Nano Banana API');
+    }
+}
+
+/**
+ * Handle Gemini Image Generation
+ */
+async function handleGeminiImageGeneration(selectedModelName) {
     // Get the master prompt for image generation
     const masterPrompt = document.getElementById('masterPrompt')?.value || 'A beautiful image';
     
-    console.log('Image generation prompt:', masterPrompt);
+    // Get JSON data for enhanced context
+    const jsonData = launchModeState.currentJSON || generateJSON();
+    const promptText = formatPromptForGemini(jsonData);
+    
+    console.log('Gemini image generation with enhanced prompt');
     
     // For Gemini models with image generation capability, use generateContent endpoint
     const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModelName}:generateContent?key=${launchModeState.apiKey}`;
     console.log('Endpoint:', apiEndpoint.replace(launchModeState.apiKey, 'API_KEY_HIDDEN'));
     
-    // Different request structure for image generation with Gemini models
+    // Request structure for image generation
     const imageRequest = {
         contents: [{
             parts: [{
-                text: `Generate an image: ${masterPrompt}`
+                text: promptText
             }]
         }],
         generationConfig: {
             temperature: 0.7,
             topK: 40,
             topP: 0.95,
-            maxOutputTokens: 1024,
+            maxOutputTokens: 2048,
         },
         safetySettings: [
             {
@@ -1404,7 +1477,7 @@ async function handleImageGeneration(selectedModelName) {
         ]
     };
     
-    console.log('Image request payload:', JSON.stringify(imageRequest, null, 2));
+    console.log('Image request sent to Gemini');
     
     const response = await axios.post(apiEndpoint, imageRequest, {
         headers: {
@@ -1413,64 +1486,67 @@ async function handleImageGeneration(selectedModelName) {
         timeout: 120000 // Longer timeout for image generation
     });
     
-    console.log(`✅ Image generation API call successful with model: ${selectedModelName}`);
+    console.log(`✅ Gemini image generation API call successful with model: ${selectedModelName}`);
     hideLoading();
 
-    // Most Gemini models return text content, even for "image generation"
-    // They provide detailed descriptions or instructions rather than actual images
+    // Most Gemini models return text content (descriptions/prompts)
     if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
         const generatedText = response.data.candidates[0].content.parts[0].text;
         displayGeminiResponse(generatedText);
-        showToast('Image description generated successfully!', 'success');
+        showToast('Enhanced image prompt generated! Use this with image generation services.', 'success');
     } else if (response.data?.candidates?.[0]?.image) {
-        // Actual image data (rare with current Gemini models)
-        displayImageResponse(response.data.candidates[0].image, selectedModelName);
+        // Actual image data (if supported)
+        displayGeneratedImage(response.data.candidates[0].image, 'data', selectedModelName);
         showToast('Image generated successfully!', 'success');
     } else if (response.data?.image) {
         // Alternative image response format
-        displayImageResponse(response.data.image, selectedModelName);
+        displayGeneratedImage(response.data.image, 'data', selectedModelName);
         showToast('Image generated successfully!', 'success');
     } else {
-        console.log('Full response:', response.data);
         displayAPIResponse(response.data);
-        showToast('Image generation completed!', 'success');
+        showToast('Response received from API', 'success');
     }
 }
 
 /**
- * Display Image Response
+ * Display Generated Image
  */
-function displayImageResponse(imageData, modelName) {
+function displayGeneratedImage(imageData, format, modelName) {
     const responseSection = document.getElementById('responseSection');
     const responseContent = document.getElementById('responseContent');
     
     let imageHtml = '';
     
-    // Handle different image response formats
-    if (typeof imageData === 'string' && imageData.startsWith('data:')) {
-        // Base64 image data
-        imageHtml = `<img src="${imageData}" alt="Generated Image" class="response-image">`;
-    } else if (imageData.url) {
+    // Handle different image formats
+    if (format === 'base64') {
+        // Base64 image data (with or without data URI prefix)
+        const imgSrc = imageData.startsWith('data:') ? imageData : `data:image/png;base64,${imageData}`;
+        imageHtml = `<img src="${imgSrc}" alt="Generated Image" class="response-image">`;
+    } else if (format === 'url') {
         // Image URL
-        imageHtml = `<img src="${imageData.url}" alt="Generated Image" class="response-image">`;
-    } else if (imageData.base64) {
-        // Base64 in object format
-        const mimeType = imageData.mimeType || 'image/png';
-        imageHtml = `<img src="data:${mimeType};base64,${imageData.base64}" alt="Generated Image" class="response-image">`;
-    } else {
-        // Fallback - show raw data
-        imageHtml = `<pre class="json-preview">${JSON.stringify(imageData, null, 2)}</pre>`;
+        imageHtml = `<img src="${imageData}" alt="Generated Image" class="response-image">`;
+    } else if (format === 'data') {
+        // Complex data object
+        if (imageData.url) {
+            imageHtml = `<img src="${imageData.url}" alt="Generated Image" class="response-image">`;
+        } else if (imageData.base64) {
+            const mimeType = imageData.mimeType || 'image/png';
+            imageHtml = `<img src="data:${mimeType};base64,${imageData.base64}" alt="Generated Image" class="response-image">`;
+        } else {
+            imageHtml = `<pre class="json-preview">${JSON.stringify(imageData, null, 2)}</pre>`;
+        }
     }
     
     responseContent.innerHTML = `
         <div class="image-response">
-            <h4>🎨 Generated Image</h4>
+            <h4>🎨 Generated Image from Nano Banana</h4>
             <div class="generated-image-container">
                 ${imageHtml}
             </div>
             <div class="image-info">
                 <p><strong>Model:</strong> ${modelName}</p>
                 <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+                <p><strong>Reference Images Used:</strong> ${launchModeState.referenceImages?.length || 0}</p>
             </div>
             <div class="image-actions">
                 <button class="btn-primary" onclick="downloadGeneratedImage()">
@@ -1485,6 +1561,13 @@ function displayImageResponse(imageData, modelName) {
 
     responseSection.style.display = 'block';
     responseSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+/**
+ * Display Image Response
+ */
+function displayImageResponse(imageData, modelName) {
+    displayGeneratedImage(imageData, 'data', modelName);
 }
 
 /**

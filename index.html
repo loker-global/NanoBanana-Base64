@@ -140,10 +140,22 @@
             <!-- API Key Input -->
             <div class="api-key-section" id="apiKeySection">
                 <div class="api-key-card">
-                    <h3>🔑 Google API Key Required</h3>
-                    <p>Enter your Google Gemini API key to enhance your prompts with AI. Your key is never stored.</p>
-                    <p class="api-key-help"><strong>Get your free API key:</strong> <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a></p>
-                    <input type="password" id="apiKeyInput" placeholder="Enter your API key..." class="api-key-input">
+                    <h3>🔑 API Configuration</h3>
+                    <p>Configure your API settings. Your key is never stored.</p>
+                    <p class="api-key-help"><strong>Get your free Gemini API key:</strong> <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a></p>
+                    
+                    <div class="api-config-section">
+                        <label for="apiKeyInput">API Key:</label>
+                        <input type="password" id="apiKeyInput" placeholder="Enter your API key..." class="api-key-input">
+                    </div>
+                    
+                    <div class="api-config-section">
+                        <label for="nanoBananaEndpoint">Nano Banana API Endpoint (Optional):</label>
+                        <input type="text" id="nanoBananaEndpoint" placeholder="https://api.nanobanana.ai/v1/generate" 
+                               value="https://api.nanobanana.ai/v1/generate" class="api-endpoint-input">
+                        <p class="setting-hint">Leave default or configure your own Nano Banana endpoint</p>
+                    </div>
+                    
                     <button class="btn-primary" id="setApiKeyBtn">Set API Key</button>
                 </div>
             </div>
