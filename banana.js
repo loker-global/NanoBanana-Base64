@@ -211,7 +211,7 @@ function processImage(file) {
     
     reader.onload = (e) => {
         const imageData = {
-            id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+            id: Date.now() + '_' + Math.random().toString(36).substring(2, 11),
             name: file.name,
             size: formatFileSize(file.size),
             base64: e.target.result,
@@ -260,6 +260,7 @@ function removeImage(id) {
     state.referenceImages = state.referenceImages.filter(img => img.id !== id);
     const item = document.querySelector(`.reference-item[data-id="${id}"]`);
     if (item) {
+        // Use CSS animation defined in styles (scaleOut animation)
         item.style.animation = 'scaleOut 0.3s ease';
         setTimeout(() => item.remove(), 300);
     }
@@ -446,7 +447,7 @@ function buildEnhancementPrompt() {
  * Call Gemini API
  */
 async function callGeminiAPI(prompt, type) {
-    const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${state.selectedModel}:generateContent?key=${state.apiKey}`;
+    const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${state.selectedModel}:generateContent`;
     
     const requestBody = {
         contents: [{
@@ -478,7 +479,8 @@ async function callGeminiAPI(prompt, type) {
     
     const response = await axios.post(apiEndpoint, requestBody, {
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'x-goog-api-key': state.apiKey
         },
         timeout: 60000
     });
@@ -512,15 +514,23 @@ function displayResult(result, type) {
                 <h3>✨ Enhanced Prompt</h3>
                 <pre>${escapeHtml(generatedText)}</pre>
                 <div class="result-actions">
-                    <button class="result-btn" onclick="copyText('${escapeForAttribute(generatedText)}')">
+                    <button class="result-btn copy-enhanced-btn" data-text="${escapeForAttribute(generatedText)}">
                         📋 Copy Enhanced Prompt
                     </button>
-                    <button class="result-btn" onclick="applyEnhancedPrompt('${escapeForAttribute(generatedText)}')">
+                    <button class="result-btn apply-enhanced-btn" data-text="${escapeForAttribute(generatedText)}">
                         ✅ Apply to Prompt Field
                     </button>
                 </div>
             </div>
         `;
+        
+        // Add event listeners
+        resultItem.querySelector('.copy-enhanced-btn').addEventListener('click', function() {
+            copyText(this.dataset.text);
+        });
+        resultItem.querySelector('.apply-enhanced-btn').addEventListener('click', function() {
+            applyEnhancedPrompt(this.dataset.text);
+        });
     } else {
         // For generation, display the AI's response
         resultItem.innerHTML = `
@@ -529,11 +539,16 @@ function displayResult(result, type) {
                 <pre style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 12px; color: white; white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(generatedText)}</pre>
             </div>
             <div class="result-actions">
-                <button class="result-btn" onclick="copyText('${escapeForAttribute(generatedText)}')">
+                <button class="result-btn copy-result-btn" data-text="${escapeForAttribute(generatedText)}">
                     📋 Copy Response
                 </button>
             </div>
         `;
+        
+        // Add event listener
+        resultItem.querySelector('.copy-result-btn').addEventListener('click', function() {
+            copyText(this.dataset.text);
+        });
     }
     
     elements.resultsContent.insertBefore(resultItem, elements.resultsContent.firstChild);
@@ -548,7 +563,7 @@ function displayResult(result, type) {
 /**
  * Copy Text to Clipboard
  */
-window.copyText = async function(text) {
+async function copyText(text) {
     try {
         await navigator.clipboard.writeText(text);
         showToast('Copied to clipboard!');
@@ -556,12 +571,12 @@ window.copyText = async function(text) {
         console.error('Copy failed:', error);
         showToast('Failed to copy', 'error');
     }
-};
+}
 
 /**
  * Apply Enhanced Prompt
  */
-window.applyEnhancedPrompt = function(enhancedText) {
+function applyEnhancedPrompt(enhancedText) {
     // Try to extract the main prompt from the enhanced text
     const lines = enhancedText.split('\n');
     let mainPrompt = '';
@@ -611,7 +626,7 @@ window.applyEnhancedPrompt = function(enhancedText) {
     }
     
     showToast('Enhanced prompt applied!');
-};
+}
 
 /**
  * Clear Results
