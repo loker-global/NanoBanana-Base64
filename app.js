@@ -3,6 +3,15 @@
 // ===================================
 
 /**
+ * Configuration Constants
+ */
+const CONFIG = {
+    // Token estimation (adjust based on your LLM model)
+    CHARS_PER_TOKEN: 4,  // ~4 characters per token for Base64
+    COST_PER_1K_TOKENS: 0.002,  // $0.002 per 1K tokens (adjust for your model)
+};
+
+/**
  * Application State
  */
 const state = {
@@ -12,7 +21,8 @@ const state = {
         enabled: true,
         quality: 0.7,  // 0.0 to 1.0
         maxWidth: 1024,
-        maxHeight: 1024
+        maxHeight: 1024,
+        convertPngToJpeg: false  // Option to convert PNG to JPEG for better compression
     }
 };
 
@@ -101,11 +111,11 @@ function updateTokenCostEstimate() {
         totalBase64Length += img.base64.length;
     });
     
-    // Estimate tokens (roughly 1 token per 4 characters for Base64)
-    const estimatedTokens = Math.ceil(totalBase64Length / 4);
+    // Estimate tokens using configurable ratio
+    const estimatedTokens = Math.ceil(totalBase64Length / CONFIG.CHARS_PER_TOKEN);
     
-    // Estimate cost (example: $0.002 per 1K tokens for input - adjust based on actual model)
-    const estimatedCost = (estimatedTokens / 1000) * 0.002;
+    // Estimate cost using configurable price
+    const estimatedCost = (estimatedTokens / 1000) * CONFIG.COST_PER_1K_TOKENS;
     
     elements.tokenCost.textContent = estimatedCost < 0.01 
         ? '< $0.01' 
