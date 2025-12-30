@@ -825,13 +825,21 @@ function generateJSON() {
         .split(',').map(s => s.trim()).filter(s => s);
 
     // Reference images
-    const referenceImages = launchModeState.referenceImages.map((ref, index) => ({
-        id: ref.id,
-        type: ref.type,
-        image_base64: ref.image.base64,
-        weight: ref.weight,
-        lock: ref.lock.length > 0 ? ref.lock : undefined
-    }));
+    const referenceImages = launchModeState.referenceImages.map((ref, index) => {
+        const imageObj = {
+            id: ref.id,
+            type: ref.type,
+            image_base64: ref.image.base64,
+            weight: ref.weight
+        };
+        
+        // Only include lock if it has values
+        if (ref.lock && ref.lock.length > 0) {
+            imageObj.lock = ref.lock;
+        }
+        
+        return imageObj;
+    });
 
     // Composition
     const composition = {
@@ -913,8 +921,9 @@ async function sendToGoogleAPI() {
     document.getElementById('loadingOverlay').querySelector('.loading-text').textContent = 'Sending to Google API...';
 
     try {
-        // NOTE: Update this URL with the actual Google API endpoint
-        const apiEndpoint = 'https://generativelanguage.googleapis.com/v1beta/models/nano-banana-pro:generate';
+        // NOTE: This is a placeholder endpoint. Update with your actual API endpoint.
+        // The nano-banana-pro model and endpoint should be configured based on your API provider.
+        const apiEndpoint = 'https://your-api-endpoint.com/v1/generate';
         
         const response = await axios.post(apiEndpoint, launchModeState.currentJSON, {
             headers: {
@@ -945,10 +954,24 @@ async function sendToGoogleAPI() {
 
         showToast(errorMessage, 'error');
 
-        // Show mock response for testing
-        if (confirm('API call failed. Would you like to see a mock response for testing?')) {
-            displayMockResponse();
-        }
+        // Offer mock response for testing without blocking confirm dialog
+        setTimeout(() => {
+            const mockBtn = document.createElement('button');
+            mockBtn.textContent = '🧪 View Mock Response (Testing)';
+            mockBtn.className = 'btn-secondary';
+            mockBtn.style.marginTop = '20px';
+            mockBtn.onclick = () => {
+                displayMockResponse();
+                mockBtn.remove();
+            };
+            
+            const responseSection = document.getElementById('responseSection');
+            if (responseSection) {
+                responseSection.style.display = 'block';
+                responseSection.innerHTML = '<h3>⚠️ API Call Failed</h3><p>You can test the interface with a mock response:</p>';
+                responseSection.appendChild(mockBtn);
+            }
+        }, 500);
     }
 }
 
