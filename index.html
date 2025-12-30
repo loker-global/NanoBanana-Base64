@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Transform images into Base64 strings with style - A stunning web application for converting images to Base64 encoding">
+    <meta name="keywords" content="base64, image converter, image to base64, encoder, web tool">
+    <meta name="author" content="NanoBanana Team">
+    <title>🍌 NanoBanana-Base64 | Image to Base64 Converter</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.2/dist/axios.min.js"></script>
+</head>
+<body>
+    <!-- Background Gradient -->
+    <div class="gradient-bg"></div>
+    
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1 class="title">
+                <span class="banana-icon">🍌</span>
+                NanoBanana-Base64
+            </h1>
+            <p class="subtitle">Transform images into Base64 strings with style</p>
+        </header>
+
+        <!-- Upload Section -->
+        <section class="upload-section">
+            <div class="drop-zone" id="dropZone">
+                <div class="drop-zone-content">
+                    <div class="upload-icon">📁</div>
+                    <h2 class="drop-zone-title">Drag & Drop Images Here</h2>
+                    <p class="drop-zone-subtitle">or</p>
+                    <label for="fileInput" class="file-input-label">
+                        Choose Files
+                    </label>
+                    <input 
+                        type="file" 
+                        id="fileInput" 
+                        class="file-input" 
+                        accept="image/*" 
+                        multiple
+                    >
+                    <p class="drop-zone-hint">Supports: JPG, PNG, GIF, SVG, WebP, BMP</p>
+                </div>
+            </div>
+
+            <!-- Compression Settings -->
+            <div class="compression-settings">
+                <div class="settings-header">
+                    <h3>🔧 Compression Settings</h3>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="compressionToggle" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="settings-content" id="settingsContent">
+                    <div class="setting-item">
+                        <label for="qualitySlider">Quality: <span id="qualityValue">70%</span></label>
+                        <input type="range" id="qualitySlider" min="10" max="100" value="70" class="slider">
+                        <p class="setting-hint">Lower = smaller file, higher = better quality</p>
+                    </div>
+                    <div class="setting-item">
+                        <label for="maxDimensionSelect">Max Dimensions:</label>
+                        <select id="maxDimensionSelect" class="dimension-select">
+                            <option value="512">512px (Tiny - for icons)</option>
+                            <option value="1024" selected>1024px (Small - for thumbnails)</option>
+                            <option value="1920">1920px (Medium - for web)</option>
+                            <option value="2560">2560px (Large - high quality)</option>
+                            <option value="99999">Original (No resize)</option>
+                        </select>
+                        <p class="setting-hint">Images larger than this will be resized</p>
+                    </div>
+                    <div class="setting-item">
+                        <div class="cost-estimate" id="costEstimate">
+                            <span class="cost-icon">💰</span>
+                            <span class="cost-text">Token cost: <strong id="tokenCost">~$0.00</strong></span>
+                        </div>
+                        <div class="size-summary" id="sizeSummary">
+                            <span class="size-icon">📊</span>
+                            <span class="size-text">Total size: <strong id="totalSize">0 B</strong> | Target: <strong id="targetSize">100 KB</strong></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Instructions Section -->
+        <section class="instructions">
+            <div class="instruction-card">
+                <div class="instruction-number">1</div>
+                <div class="instruction-content">
+                    <h3>Upload</h3>
+                    <p>Drag & drop or select images</p>
+                </div>
+            </div>
+            <div class="instruction-arrow">→</div>
+            <div class="instruction-card">
+                <div class="instruction-number">2</div>
+                <div class="instruction-content">
+                    <h3>Preview</h3>
+                    <p>View your images in the gallery</p>
+                </div>
+            </div>
+            <div class="instruction-arrow">→</div>
+            <div class="instruction-card">
+                <div class="instruction-number">3</div>
+                <div class="instruction-content">
+                    <h3>Click & Copy</h3>
+                    <p>Click any image to copy Base64</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Gallery Section -->
+        <section class="gallery-section" id="gallerySection">
+            <div class="gallery-header">
+                <h2 class="gallery-title">Your Images</h2>
+                <button class="launch-mode-btn" id="launchModeBtn" style="display: none;">
+                    🚀 LAUNCH MODE
+                </button>
+            </div>
+            <div class="gallery" id="gallery">
+                <!-- Images will be dynamically added here -->
+            </div>
+            <div class="empty-state" id="emptyState">
+                <div class="empty-icon">🖼️</div>
+                <p>No images yet. Upload some to get started!</p>
+            </div>
+        </section>
+
+        <!-- LAUNCH MODE Section (initially hidden) -->
+        <section class="launch-mode-section" id="launchModeSection" style="display: none;">
+            <div class="launch-header">
+                <h2 class="launch-title">🚀 LAUNCH MODE - AI Prompt Enhancement</h2>
+                <button class="back-btn" id="backToGalleryBtn">← Back to Gallery</button>
+            </div>
+
+            <!-- API Key Input -->
+            <div class="api-key-section" id="apiKeySection">
+                <div class="api-key-card">
+                    <h3>🔑 API Configuration</h3>
+                    <p>Configure your API settings. Your key is never stored.</p>
+                    <p class="api-key-help"><strong>Get your free Gemini API key:</strong> <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a></p>
+                    
+                    <div class="api-config-section">
+                        <label for="apiKeyInput">API Key:</label>
+                        <input type="password" id="apiKeyInput" placeholder="Enter your API key..." class="api-key-input">
+                    </div>
+                    
+                    <div class="api-config-section">
+                        <label for="nanoBananaEndpoint">Nano Banana API Endpoint (Optional):</label>
+                        <input type="text" id="nanoBananaEndpoint" placeholder="https://api.nanobanana.ai/v1/generate" 
+                               value="https://api.nanobanana.ai/v1/generate" class="api-endpoint-input">
+                        <p class="setting-hint">Leave default or configure your own Nano Banana endpoint</p>
+                    </div>
+                    
+                    <button class="btn-primary" id="setApiKeyBtn">Set API Key</button>
+                </div>
+            </div>
+
+            <!-- Main Launch Interface (hidden until API key is set) -->
+            <div class="launch-interface" id="launchInterface" style="display: none;">
+                
+                <!-- Master Prompt Section -->
+                <div class="prompt-section">
+                    <h3>💬 Master Prompt</h3>
+                    <textarea id="masterPrompt" class="master-prompt-input" rows="6" 
+                        placeholder="Enter your detailed prompt here...">Create a high-end editorial image for an Instagram Reel cover...</textarea>
+                    
+                    <div class="negative-prompts">
+                        <h4>🚫 Negative Prompts (comma-separated)</h4>
+                        <textarea id="negativePrompts" class="negative-prompt-input" rows="3" 
+                            placeholder="mystical clichés, chakra symbols, aura glow...">mystical clichés, chakra symbols, aura glow, smoke</textarea>
+                    </div>
+                </div>
+
+                <!-- Reference Images Assignment -->
+                <div class="reference-images-section">
+                    <h3>🖼️ Reference Images</h3>
+                    <div id="referenceImagesList" class="reference-images-list">
+                        <!-- Will be populated with uploaded images -->
+                    </div>
+                </div>
+
+                <!-- Parameters Section -->
+                <div class="parameters-section">
+                    <h3>⚙️ Generation Parameters</h3>
+                    
+                    <div class="param-tabs">
+                        <button class="param-tab active" data-tab="composition">Composition</button>
+                        <button class="param-tab" data-tab="style">Style</button>
+                        <button class="param-tab" data-tab="technical">Technical</button>
+                        <button class="param-tab" data-tab="output">Output</button>
+                    </div>
+
+                    <!-- Composition Tab -->
+                    <div class="param-content active" id="composition-tab">
+                        <div class="param-grid">
+                            <div class="param-item">
+                                <label>Framing:</label>
+                                <select id="framing">
+                                    <option value="medium_close_up">Medium Close Up</option>
+                                    <option value="close_up">Close Up</option>
+                                    <option value="wide_shot">Wide Shot</option>
+                                    <option value="full_body">Full Body</option>
+                                </select>
+                            </div>
+                            <div class="param-item">
+                                <label>Perspective:</label>
+                                <select id="perspective">
+                                    <option value="eye_level">Eye Level</option>
+                                    <option value="low_angle">Low Angle</option>
+                                    <option value="high_angle">High Angle</option>
+                                </select>
+                            </div>
+                            <div class="param-item">
+                                <label>Subject Placement:</label>
+                                <select id="subjectPlacement">
+                                    <option value="centered">Centered</option>
+                                    <option value="left">Left</option>
+                                    <option value="right">Right</option>
+                                </select>
+                            </div>
+                            <div class="param-item">
+                                <label>Background:</label>
+                                <input type="text" id="background" value="minimal, clean, dark-neutral">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Style Tab -->
+                    <div class="param-content" id="style-tab">
+                        <div class="param-grid">
+                            <div class="param-item">
+                                <label>Genre:</label>
+                                <input type="text" id="genre" value="editorial cinematic portrait">
+                            </div>
+                            <div class="param-item">
+                                <label>Mood:</label>
+                                <input type="text" id="mood" value="grounded, intense, calm authority">
+                            </div>
+                            <div class="param-item">
+                                <label>Color Grading:</label>
+                                <input type="text" id="colorGrading" value="neutral, low saturation, premium contrast">
+                            </div>
+                            <div class="param-item">
+                                <label>Texture:</label>
+                                <input type="text" id="texture" value="real skin texture, natural pores">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Technical Tab -->
+                    <div class="param-content" id="technical-tab">
+                        <div class="param-grid">
+                            <div class="param-item">
+                                <label>Camera Look:</label>
+                                <select id="cameraLook">
+                                    <option value="cinema_dslr">Cinema DSLR</option>
+                                    <option value="film_camera">Film Camera</option>
+                                    <option value="digital">Digital</option>
+                                </select>
+                            </div>
+                            <div class="param-item">
+                                <label>Focal Length:</label>
+                                <select id="focalLength">
+                                    <option value="50mm_portrait">50mm Portrait</option>
+                                    <option value="85mm">85mm</option>
+                                    <option value="35mm">35mm</option>
+                                </select>
+                            </div>
+                            <div class="param-item">
+                                <label>Aperture:</label>
+                                <select id="aperture">
+                                    <option value="f/4.0">f/4.0</option>
+                                    <option value="f/2.8">f/2.8</option>
+                                    <option value="f/1.8">f/1.8</option>
+                                </select>
+                            </div>
+                            <div class="param-item">
+                                <label>Lighting Type:</label>
+                                <select id="lightingType">
+                                    <option value="studio">Studio</option>
+                                    <option value="natural">Natural</option>
+                                    <option value="mixed">Mixed</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Output Tab -->
+                    <div class="param-content" id="output-tab">
+                        <div class="param-grid">
+                            <div class="param-item">
+                                <label>Aspect Ratio:</label>
+                                <select id="aspectRatio">
+                                    <option value="9:16">9:16 (Instagram Reels)</option>
+                                    <option value="1:1">1:1 (Square)</option>
+                                    <option value="16:9">16:9 (Landscape)</option>
+                                    <option value="4:5">4:5 (Instagram Post)</option>
+                                </select>
+                            </div>
+                            <div class="param-item">
+                                <label>Width:</label>
+                                <input type="number" id="outputWidth" value="2160">
+                            </div>
+                            <div class="param-item">
+                                <label>Height:</label>
+                                <input type="number" id="outputHeight" value="3840">
+                            </div>
+                            <div class="param-item">
+                                <label>Format:</label>
+                                <select id="outputFormat">
+                                    <option value="png">PNG</option>
+                                    <option value="jpg">JPG</option>
+                                    <option value="webp">WebP</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- JSON Preview -->
+                <div class="json-preview-section">
+                    <h3>📋 JSON Preview</h3>
+                    <button class="btn-secondary" id="generateJsonBtn">Generate JSON</button>
+                    <pre id="jsonPreview" class="json-preview"></pre>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="launch-actions">
+                    <button class="btn-primary btn-large" id="sendToGoogleBtn">
+                        🚀 Enhance Prompt with Gemini
+                    </button>
+                    <button class="btn-secondary" id="downloadJsonBtn">
+                        💾 Download JSON
+                    </button>
+                </div>
+
+                <!-- Response Section -->
+                <div class="response-section" id="responseSection" style="display: none;">
+                    <h3>✨ Generated Result</h3>
+                    <div id="responseContent" class="response-content"></div>
+                    <button class="btn-primary" id="downloadResultBtn">Download Result</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Made with 🍌 by the NanoBanana Team | 
+                <a href="https://github.com/loker-global/NanoBanana-Base64" target="_blank" rel="noopener">
+                    GitHub
+                </a>
+            </p>
+            <p class="privacy-note">🔒 All processing happens locally in your browser. No data is uploaded.</p>
+        </footer>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+        <span class="toast-icon">✅</span>
+        <span class="toast-message" id="toastMessage">Base64 copied to clipboard!</span>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <p class="loading-text">Processing images...</p>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
