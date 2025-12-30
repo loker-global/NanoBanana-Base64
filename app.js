@@ -70,6 +70,7 @@ function init() {
     
     setupEventListeners();
     setupCompressionSettings();
+    initLaunchMode(); // Initialize Launch Mode
     console.log('🍌 NanoBanana-Base64 initialized with compression!');
 }
 
@@ -618,7 +619,8 @@ if (document.readyState === 'loading') {
 const launchModeState = {
     apiKey: null,
     referenceImages: [],
-    currentJSON: null
+    currentJSON: null,
+    availableModels: null
 };
 
 /**
@@ -642,6 +644,10 @@ function initLaunchMode() {
         }
     }
 
+    // Make function globally accessible and call it initially
+    window.updateLaunchButtonVisibility = updateLaunchButtonVisibility;
+    updateLaunchButtonVisibility();
+
     // Toggle between gallery and launch mode
     launchModeBtn.addEventListener('click', () => {
         document.getElementById('gallerySection').style.display = 'none';
@@ -655,7 +661,7 @@ function initLaunchMode() {
     });
 
     // API Key handling
-    setApiKeyBtn.addEventListener('click', () => {
+    setApiKeyBtn.addEventListener('click', async () => {
         const apiKeyInput = document.getElementById('apiKeyInput');
         const apiKey = apiKeyInput.value.trim();
 
@@ -664,17 +670,56 @@ function initLaunchMode() {
             return;
         }
 
-        // Store API key in memory only (never persisted)
-        launchModeState.apiKey = apiKey;
+        // Show loading while validating
+        setApiKeyBtn.disabled = true;
+        setApiKeyBtn.textContent = 'Validating...';
+        showLoading();
+        document.getElementById('loadingOverlay').querySelector('.loading-text').textContent = 'Validating API key...';
 
-        // Hide API key section, show main interface
-        document.getElementById('apiKeySection').style.display = 'none';
-        document.getElementById('launchInterface').style.display = 'block';
+        try {
+            // Validate the API key
+            const validation = await validateApiKey(apiKey);
+            
+            if (!validation.isValid) {
+                hideLoading();
+                setApiKeyBtn.disabled = false;
+                setApiKeyBtn.textContent = 'Set API Key';
+                showToast(validation.error, 'error');
+                return;
+            }
 
-        // Clear input for security
-        apiKeyInput.value = '';
+            // Store API key and available models
+            launchModeState.apiKey = apiKey;
+            launchModeState.categorizedModels = validation.categorizedModels;
 
-        showToast('API Key set successfully! (stored in memory only)', 'success');
+            hideLoading();
+            setApiKeyBtn.disabled = false;
+            setApiKeyBtn.textContent = 'Set API Key';
+
+            // Hide API key section, show main interface
+            document.getElementById('apiKeySection').style.display = 'none';
+            document.getElementById('launchInterface').style.display = 'block';
+
+            // Add model selector to the interface
+            addModelSelectorToInterface(validation.categorizedModels);
+
+            // Clear input for security
+            apiKeyInput.value = '';
+
+            const totalModels = validation.totalModels;
+            const textCount = validation.categorizedModels.textGeneration.length;
+            const imageCount = validation.categorizedModels.imageGeneration.length;
+            
+            showToast(`✅ API key validated! Found ${totalModels} models (${textCount} text, ${imageCount} image)`, 'success');
+            console.log('Model categories:', validation.categorizedModels);
+            
+        } catch (error) {
+            hideLoading();
+            setApiKeyBtn.disabled = false;
+            setApiKeyBtn.textContent = 'Set API Key';
+            console.error('API key validation error:', error);
+            showToast('Failed to validate API key. Please try again.', 'error');
+        }
     });
 
     // Parameter tabs
@@ -730,9 +775,178 @@ function initLaunchMode() {
         // Will be implemented based on API response
         showToast('Download functionality will be available after generation', 'success');
     });
+}
 
-    // Call this when images are added/removed
-    window.updateLaunchButtonVisibility = updateLaunchButtonVisibility;
+/**
+ * Add Model Selector to Interface
+ */
+function addModelSelectorToInterface(categorizedModels) {
+    // Find the parameters section to add the model selector
+    const parametersSection = document.querySelector('.parameters-section');
+    
+    if (!parametersSection) {
+        console.error('Parameters section not found');
+        return;
+    }
+    
+    // Create model selector HTML
+    const modelSelectorHTML = `
+        <div class="model-selector-section">
+            <h3>🤖 Model Selection</h3>
+            <div class="model-selector-grid">
+                <div class="model-category">
+                    <label for="generationType">Generation Type:</label>
+                    <select id="generationType" class="generation-type-select">
+                        <option value="text">Text/Prompt Enhancement</option>
+                        <option value="image">Image Descriptions & Visual Concepts</option>
+                        <option value="all">Show All Available Models</option>
+                    </select>
+                </div>
+                <div class="model-category">
+                    <label for="selectedModel">Available Models:</label>
+                    <select id="selectedModel" class="model-select">
+                        <!-- Will be populated based on generation type -->
+                    </select>
+                </div>
+                <div class="model-info" id="modelInfo">
+                    <span class="model-info-text">Select a model to see details</span>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Insert the model selector at the beginning of the parameters section
+    parametersSection.insertAdjacentHTML('afterbegin', modelSelectorHTML);
+    
+    // Add event listeners for the selectors
+    const generationTypeSelect = document.getElementById('generationType');
+    const modelSelect = document.getElementById('selectedModel');
+    const modelInfo = document.getElementById('modelInfo');
+    
+    // Function to populate model select based on generation type
+    function populateModelSelect(type) {
+        let models;
+        
+        if (type === 'all') {
+            models = categorizedModels.allModels || [];
+        } else {
+            models = type === 'text' 
+                ? categorizedModels.textGeneration 
+                : categorizedModels.imageGeneration;
+        }
+        
+        console.log(`🔍 Populating ${type} models:`, models.map(m => ({
+            name: m.name,
+            displayName: m.displayName,
+            methods: m.supportedGenerationMethods
+        })));
+        
+        modelSelect.innerHTML = '';
+        
+        if (models.length === 0) {
+            modelSelect.innerHTML = '<option value="">No models available</option>';
+            modelInfo.innerHTML = '<span class="model-info-text">No models available for this type</span>';
+            console.warn(`⚠️ No ${type} models available`);
+            return;
+        }
+        
+        // Add models to select
+        models.forEach(model => {
+            const option = document.createElement('option');
+            const modelName = model.name.replace('models/', '');
+            option.value = modelName;
+            
+            // Enhanced display name logic for custom models
+            let displayName = model.displayName || modelName;
+            
+            // Special handling for Nano Banana models
+            if (modelName.toLowerCase().includes('nano') || 
+                modelName.toLowerCase().includes('banana') ||
+                displayName.toLowerCase().includes('nano') || 
+                displayName.toLowerCase().includes('banana')) {
+                // Add emoji and format for Nano Banana models
+                if (!displayName.includes('🍌')) {
+                    displayName = `🍌 ${displayName}`;
+                }
+            } else if (modelName.includes('gemini')) {
+                // Add emoji for Gemini models
+                if (!displayName.includes('✨')) {
+                    displayName = `✨ ${displayName}`;
+                }
+            } else if (modelName.includes('imagen')) {
+                // Add emoji for Imagen models
+                if (!displayName.includes('🎨')) {
+                    displayName = `🎨 ${displayName}`;
+                }
+            }
+            
+            option.textContent = displayName;
+            option.dataset.fullModel = JSON.stringify(model);
+            modelSelect.appendChild(option);
+        });
+        
+        // Select the first model by default
+        if (models.length > 0) {
+            modelSelect.selectedIndex = 0;
+            updateModelInfo();
+        }
+    }
+    
+    // Function to update model info display
+    function updateModelInfo() {
+        const selectedOption = modelSelect.options[modelSelect.selectedIndex];
+        if (!selectedOption || !selectedOption.dataset.fullModel) {
+            modelInfo.innerHTML = '<span class="model-info-text">Select a model to see details</span>';
+            return;
+        }
+        
+        const model = JSON.parse(selectedOption.dataset.fullModel);
+        const inputLimit = model.inputTokenLimit ? `${model.inputTokenLimit.toLocaleString()} tokens` : 'Not specified';
+        const outputLimit = model.outputTokenLimit ? `${model.outputTokenLimit.toLocaleString()} tokens` : 'Not specified';
+        const methods = model.supportedGenerationMethods ? model.supportedGenerationMethods.join(', ') : 'Not specified';
+        
+        modelInfo.innerHTML = `
+            <div class="model-details">
+                <p><strong>Description:</strong> ${model.description || 'No description available'}</p>
+                <p><strong>Input Limit:</strong> ${inputLimit}</p>
+                <p><strong>Output Limit:</strong> ${outputLimit}</p>
+                <p><strong>Methods:</strong> ${methods}</p>
+                <p><strong>Version:</strong> ${model.version}</p>
+            </div>
+        `;
+    }
+    
+    // Event listeners
+    generationTypeSelect.addEventListener('change', (e) => {
+        populateModelSelect(e.target.value);
+        
+        // Show/hide prompt enhancement sections based on selection
+        const promptSection = document.querySelector('.prompt-section');
+        const jsonPreviewSection = document.querySelector('.json-preview-section');
+        const sendBtn = document.getElementById('sendToGoogleBtn');
+        
+        if (e.target.value === 'text') {
+            // Show prompt enhancement sections
+            if (promptSection) promptSection.style.display = 'block';
+            if (jsonPreviewSection) jsonPreviewSection.style.display = 'block';
+            if (sendBtn) sendBtn.textContent = '🚀 Enhance Prompt with AI';
+        } else if (e.target.value === 'image') {
+            // Hide prompt enhancement sections for direct image generation
+            if (promptSection) promptSection.style.display = 'block'; // Keep prompt for image generation
+            if (jsonPreviewSection) jsonPreviewSection.style.display = 'none';
+            if (sendBtn) sendBtn.textContent = '🎨 Generate Image Description';
+        } else if (e.target.value === 'all') {
+            // Show all sections for all models view
+            if (promptSection) promptSection.style.display = 'block';
+            if (jsonPreviewSection) jsonPreviewSection.style.display = 'block';
+            if (sendBtn) sendBtn.textContent = '🔍 Test Selected Model';
+        }
+    });
+    
+    modelSelect.addEventListener('change', updateModelInfo);
+    
+    // Initialize with text generation
+    populateModelSelect('text');
 }
 
 /**
@@ -914,90 +1128,437 @@ function generateJSON() {
 }
 
 /**
+ * Format our JSON structure into a text prompt for Gemini
+ */
+function formatPromptForGemini(jsonData) {
+    // Safe property access with defaults
+    const masterPrompt = jsonData.prompt?.text || 'No prompt specified';
+    const negativePrompts = jsonData.prompt?.negative?.join(', ') || 'None';
+    
+    const composition = jsonData.composition || {};
+    const style = jsonData.style_parameters || {};
+    const tech = jsonData.technical_specifications || {};
+    const camera = tech.camera || {};
+    const lighting = tech.lighting || {};
+    const output = jsonData.output_settings || {};
+    const resolution = output.resolution || {};
+
+    const prompt = `I need you to create an extremely detailed and professional image generation prompt based on these specifications. This prompt will be used with image generation AI models like Midjourney, DALL-E, or Stable Diffusion.
+
+ORIGINAL SPECIFICATIONS:
+Master Prompt: ${masterPrompt}
+Negative Prompts: ${negativePrompts}
+
+Composition: ${composition.framing || 'not specified'}, ${composition.perspective || 'not specified'}, ${composition.subject_placement || 'not specified'}, ${composition.background || 'not specified'}
+
+Style: ${style.genre || 'not specified'}, ${style.mood || 'not specified'}, ${style.color_grading || 'not specified'}, ${style.texture || 'not specified'}
+
+Technical: ${camera.look || 'not specified'}, ${camera.focal_length || 'not specified'}, ${camera.aperture || 'not specified'}, ${lighting.type || 'not specified'}
+
+Output: ${output.aspect_ratio || 'not specified'}, ${resolution.width || 'not specified'}x${resolution.height || 'not specified'}, ${output.format || 'not specified'}
+
+Please create:
+1. An ENHANCED MAIN PROMPT (150-200 words) that combines all these elements into a cohesive, detailed description
+2. An OPTIMIZED NEGATIVE PROMPT list (comma-separated)
+3. TECHNICAL TAGS for camera settings and quality
+4. STYLE KEYWORDS for artistic direction
+
+Format your response clearly with headers for each section. Make the language vivid and specific for best image generation results.`;
+
+    return prompt;
+}
+
+/**
+ * Try different Gemini models in order of preference
+ */
+async function tryGeminiModels(requestData, apiKey) {
+    // Use validated available models if available, otherwise fall back to default list
+    const availableModels = launchModeState.availableModels;
+    const defaultModels = [
+        'gemini-1.5-flash',
+        'gemini-1.5-pro', 
+        'gemini-pro',
+        'gemini-1.0-pro'
+    ];
+    
+    const modelsToTry = availableModels && availableModels.length > 0 ? availableModels : defaultModels;
+    console.log('Models to try:', modelsToTry);
+    
+    for (const model of modelsToTry) {
+        try {
+            const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            console.log(`Trying model: ${model}`);
+            
+            const response = await axios.post(apiEndpoint, requestData, {
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                timeout: 60000
+            });
+            
+            console.log(`✅ Success with model: ${model}`);
+            return { response, model };
+            
+        } catch (error) {
+            console.log(`❌ Failed with model: ${model}`, error.response?.status, error.response?.data?.error?.message);
+            
+            // If it's not a 404 (model not found), throw the error
+            if (error.response?.status !== 404) {
+                throw error;
+            }
+            // Continue to next model if 404
+        }
+    }
+    
+    throw new Error('All available Gemini models failed. This should not happen if API key was validated properly.');
+}
+
+/**
  * Send to Google API
  */
 async function sendToGoogleAPI() {
     showLoading();
-    document.getElementById('loadingOverlay').querySelector('.loading-text').textContent = 'Sending to Google API...';
-
+    
     try {
-        // NOTE: This is a placeholder endpoint. Update with your actual API endpoint.
-        // The nano-banana-pro model and endpoint should be configured based on your API provider.
-        const apiEndpoint = 'https://your-api-endpoint.com/v1/generate';
+        // Get selected model and generation type
+        const generationType = document.getElementById('generationType')?.value || 'text';
+        const selectedModelName = document.getElementById('selectedModel')?.value;
         
-        const response = await axios.post(apiEndpoint, launchModeState.currentJSON, {
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${launchModeState.apiKey}`
-            },
-            timeout: 60000  // 60 second timeout
-        });
-
-        hideLoading();
-
-        // Display response
-        displayAPIResponse(response.data);
-        showToast('Image generated successfully!', 'success');
+        if (!selectedModelName) {
+            throw new Error('Please select a model first');
+        }
+        
+        console.log('🚀 Sending request to API...');
+        console.log('Generation type:', generationType);
+        console.log('Selected model:', selectedModelName);
+        console.log('API Key length:', launchModeState.apiKey?.length);
+        
+        // Determine actual API call type
+        let actualGenerationType = generationType;
+        
+        // For "all" option, determine the type based on the model name
+        if (generationType === 'all') {
+            const modelNameLower = selectedModelName.toLowerCase();
+            if (modelNameLower.includes('imagen') || modelNameLower.includes('veo')) {
+                actualGenerationType = 'image';
+            } else {
+                actualGenerationType = 'text'; // Default to text for custom models like Nano Banana
+            }
+            console.log(`🔍 Auto-detected generation type for ${selectedModelName}: ${actualGenerationType}`);
+        }
+        
+        if (actualGenerationType === 'image') {
+            document.getElementById('loadingOverlay').querySelector('.loading-text').textContent = 'Generating image...';
+            await handleImageGeneration(selectedModelName);
+        } else {
+            document.getElementById('loadingOverlay').querySelector('.loading-text').textContent = 'Enhancing prompt...';
+            await handleTextGeneration(selectedModelName);
+        }
 
     } catch (error) {
         hideLoading();
         console.error('API Error:', error);
 
-        let errorMessage = 'Failed to generate image. ';
+        let errorMessage = 'Failed to generate content. ';
         if (error.response) {
-            errorMessage += `Status: ${error.response.status}. ${error.response.data?.error?.message || ''}`;
+            const status = error.response.status;
+            const errorData = error.response.data?.error;
+            
+            if (status === 404) {
+                errorMessage += 'Model not found. Please try a different model. ';
+            } else if (status === 403) {
+                errorMessage += 'Invalid API key or insufficient permissions. Please check your Google AI Studio API key. ';
+            } else if (status === 401) {
+                errorMessage += 'Authentication failed. Please verify your API key is correct. ';
+            } else if (status === 429) {
+                errorMessage += 'Rate limit exceeded. Please wait and try again. ';
+            } else {
+                errorMessage += `Status: ${status}. ${errorData?.message || ''}`;
+            }
         } else if (error.request) {
-            errorMessage += 'No response from server. Check your API key and internet connection.';
+            errorMessage += 'No response from server. Check your internet connection.';
         } else {
             errorMessage += error.message;
         }
 
         showToast(errorMessage, 'error');
-
-        // Offer mock response for testing without blocking confirm dialog
-        setTimeout(() => {
-            const mockBtn = document.createElement('button');
-            mockBtn.textContent = '🧪 View Mock Response (Testing)';
-            mockBtn.className = 'btn-secondary';
-            mockBtn.style.marginTop = '20px';
-            mockBtn.onclick = () => {
-                displayMockResponse();
-                mockBtn.remove();
-            };
-            
-            const responseSection = document.getElementById('responseSection');
-            if (responseSection) {
-                responseSection.style.display = 'block';
-                responseSection.innerHTML = '<h3>⚠️ API Call Failed</h3><p>You can test the interface with a mock response:</p>';
-                responseSection.appendChild(mockBtn);
-            }
-        }, 500);
     }
 }
 
 /**
- * Display API Response
+ * Handle Text Generation (Prompt Enhancement)
+ */
+async function handleTextGeneration(selectedModelName) {
+    console.log('Current JSON exists:', !!launchModeState.currentJSON);
+    
+    if (!launchModeState.currentJSON) {
+        throw new Error('Please generate JSON first');
+    }
+    
+    // Build API endpoint
+    const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModelName}:generateContent?key=${launchModeState.apiKey}`;
+    console.log('Endpoint:', apiEndpoint.replace(launchModeState.apiKey, 'API_KEY_HIDDEN'));
+    
+    // Transform our JSON to Gemini API format
+    const promptText = formatPromptForGemini(launchModeState.currentJSON);
+    console.log('Generated prompt length:', promptText.length);
+    
+    const geminiRequest = {
+        contents: [{
+            parts: [{
+                text: promptText
+            }]
+        }],
+        generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 8192,
+        },
+        safetySettings: [
+            {
+                category: "HARM_CATEGORY_HARASSMENT",
+                threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+                category: "HARM_CATEGORY_HATE_SPEECH",
+                threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+                category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+                category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+                threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            }
+        ]
+    };
+    
+    console.log('Request payload:', JSON.stringify(geminiRequest, null, 2));
+    
+    const response = await axios.post(apiEndpoint, geminiRequest, {
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        timeout: 60000
+    });
+    
+    console.log(`✅ API call successful with model: ${selectedModelName}`);
+    hideLoading();
+
+    // Extract the generated content from response
+    const generatedText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (generatedText) {
+        displayGeminiResponse(generatedText);
+        showToast('Enhanced prompt generated successfully!', 'success');
+    } else {
+        throw new Error('No content generated from API');
+    }
+}
+
+/**
+ * Handle Image Generation
+ */
+async function handleImageGeneration(selectedModelName) {
+    // Get the master prompt for image generation
+    const masterPrompt = document.getElementById('masterPrompt')?.value || 'A beautiful image';
+    
+    console.log('Image generation prompt:', masterPrompt);
+    
+    // For Gemini models with image generation capability, use generateContent endpoint
+    const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModelName}:generateContent?key=${launchModeState.apiKey}`;
+    console.log('Endpoint:', apiEndpoint.replace(launchModeState.apiKey, 'API_KEY_HIDDEN'));
+    
+    // Different request structure for image generation with Gemini models
+    const imageRequest = {
+        contents: [{
+            parts: [{
+                text: `Generate an image: ${masterPrompt}`
+            }]
+        }],
+        generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 1024,
+        },
+        safetySettings: [
+            {
+                category: "HARM_CATEGORY_HARASSMENT",
+                threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+                category: "HARM_CATEGORY_HATE_SPEECH",
+                threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+                category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+                category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+                threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            }
+        ]
+    };
+    
+    console.log('Image request payload:', JSON.stringify(imageRequest, null, 2));
+    
+    const response = await axios.post(apiEndpoint, imageRequest, {
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        timeout: 120000 // Longer timeout for image generation
+    });
+    
+    console.log(`✅ Image generation API call successful with model: ${selectedModelName}`);
+    hideLoading();
+
+    // Most Gemini models return text content, even for "image generation"
+    // They provide detailed descriptions or instructions rather than actual images
+    if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        const generatedText = response.data.candidates[0].content.parts[0].text;
+        displayGeminiResponse(generatedText);
+        showToast('Image description generated successfully!', 'success');
+    } else if (response.data?.candidates?.[0]?.image) {
+        // Actual image data (rare with current Gemini models)
+        displayImageResponse(response.data.candidates[0].image, selectedModelName);
+        showToast('Image generated successfully!', 'success');
+    } else if (response.data?.image) {
+        // Alternative image response format
+        displayImageResponse(response.data.image, selectedModelName);
+        showToast('Image generated successfully!', 'success');
+    } else {
+        console.log('Full response:', response.data);
+        displayAPIResponse(response.data);
+        showToast('Image generation completed!', 'success');
+    }
+}
+
+/**
+ * Display Image Response
+ */
+function displayImageResponse(imageData, modelName) {
+    const responseSection = document.getElementById('responseSection');
+    const responseContent = document.getElementById('responseContent');
+    
+    let imageHtml = '';
+    
+    // Handle different image response formats
+    if (typeof imageData === 'string' && imageData.startsWith('data:')) {
+        // Base64 image data
+        imageHtml = `<img src="${imageData}" alt="Generated Image" class="response-image">`;
+    } else if (imageData.url) {
+        // Image URL
+        imageHtml = `<img src="${imageData.url}" alt="Generated Image" class="response-image">`;
+    } else if (imageData.base64) {
+        // Base64 in object format
+        const mimeType = imageData.mimeType || 'image/png';
+        imageHtml = `<img src="data:${mimeType};base64,${imageData.base64}" alt="Generated Image" class="response-image">`;
+    } else {
+        // Fallback - show raw data
+        imageHtml = `<pre class="json-preview">${JSON.stringify(imageData, null, 2)}</pre>`;
+    }
+    
+    responseContent.innerHTML = `
+        <div class="image-response">
+            <h4>🎨 Generated Image</h4>
+            <div class="generated-image-container">
+                ${imageHtml}
+            </div>
+            <div class="image-info">
+                <p><strong>Model:</strong> ${modelName}</p>
+                <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+            </div>
+            <div class="image-actions">
+                <button class="btn-primary" onclick="downloadGeneratedImage()">
+                    💾 Download Image
+                </button>
+                <button class="btn-secondary" onclick="copyImageToClipboard()">
+                    📋 Copy Image
+                </button>
+            </div>
+        </div>
+    `;
+
+    responseSection.style.display = 'block';
+    responseSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+/**
+ * Download Generated Image
+ */
+function downloadGeneratedImage() {
+    const img = document.querySelector('.response-image');
+    if (!img) {
+        showToast('No image to download', 'error');
+        return;
+    }
+    
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    ctx.drawImage(img, 0, 0);
+    
+    canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `generated-image-${Date.now()}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Image downloaded!', 'success');
+    });
+}
+
+/**
+ * Copy Image to Clipboard
+ */
+async function copyImageToClipboard() {
+    const img = document.querySelector('.response-image');
+    if (!img) {
+        showToast('No image to copy', 'error');
+        return;
+    }
+    
+    try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        ctx.drawImage(img, 0, 0);
+        
+        canvas.toBlob(async (blob) => {
+            const item = new ClipboardItem({ 'image/png': blob });
+            await navigator.clipboard.write([item]);
+            showToast('Image copied to clipboard!', 'success');
+        });
+    } catch (error) {
+        console.error('Failed to copy image:', error);
+        showToast('Failed to copy image to clipboard', 'error');
+    }
+}
+
+/**
+ * Display API Response (Fallback)
  */
 function displayAPIResponse(data) {
     const responseSection = document.getElementById('responseSection');
     const responseContent = document.getElementById('responseContent');
 
-    // Check if response contains an image
-    if (data.image_base64) {
-        responseContent.innerHTML = `
-            <img src="${data.image_base64}" alt="Generated Image" class="response-image">
-            <p>Generation ID: ${data.generation_id || 'N/A'}</p>
-        `;
-    } else if (data.image_url) {
-        responseContent.innerHTML = `
-            <img src="${data.image_url}" alt="Generated Image" class="response-image">
-            <p>Generation ID: ${data.generation_id || 'N/A'}</p>
-        `;
-    } else {
-        responseContent.innerHTML = `
+    // Generic response display for unexpected formats
+    responseContent.innerHTML = `
+        <div class="api-response">
+            <h4>📋 API Response</h4>
             <pre class="json-preview">${JSON.stringify(data, null, 2)}</pre>
-        `;
-    }
+            <p class="response-note">The API returned data in an unexpected format. This is the raw response.</p>
+        </div>
+    `;
 
     responseSection.style.display = 'block';
     responseSection.scrollIntoView({ behavior: 'smooth' });
@@ -1011,43 +1572,209 @@ function displayMockResponse() {
         generation_id: 'mock_' + Date.now(),
         status: 'completed',
         message: 'This is a mock response for testing purposes.',
-        image_base64: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iODAwIiBoZWlnaHQ9IjYwMCIgZmlsbD0iIzY2N2VlYSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjQwIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlRFU1QgR0VORVJBVEVEIFJFU1VMVC0gTU9DSyBJTUFHRTwvdGV4dD48L3N2Zz4='
+        enhanced_prompt: `🎨 ENHANCED MAIN PROMPT:
+A stunning editorial cinematic portrait featuring a subject in medium close-up framing, captured with cinema DSLR equipment using a 50mm portrait lens at f/4.0. The composition employs eye-level perspective with centered subject placement against a minimal, clean, dark-neutral background. The image conveys a grounded, intense mood with calm authority, rendered in an editorial cinematic portrait genre with neutral, low saturation color grading and premium contrast. Real skin texture and natural pores are emphasized for authentic detail. Professional studio lighting setup provides soft directional key light from a three-quarter direction with neutral-warm color temperature. Ultra-high detail and very high realism ensure exceptional quality with soft background separation through depth of field techniques.
+
+🚫 OPTIMIZED NEGATIVE PROMPTS:
+mystical clichés, chakra symbols, aura glow, smoke, oversaturation, artificial smoothing, plastic skin, harsh lighting, cluttered background, amateur photography
+
+⚙️ TECHNICAL TAGS:
+cinema DSLR, 50mm portrait lens, f/4.0 aperture, studio lighting, professional photography, editorial quality, cinematic composition, premium production value
+
+🎭 STYLE KEYWORDS:
+editorial, cinematic, portrait, professional, grounded, intense, calm authority, neutral tones, premium contrast, authentic texture, studio quality`
     };
 
-    displayAPIResponse(mockData);
+    displayGeminiResponse(mockData.enhanced_prompt);
+    showToast('Mock response displayed for testing!', 'success');
 }
 
 /**
- * Download JSON
+ * Categorize Models by Type
  */
-function downloadJSON(json) {
-    const jsonString = JSON.stringify(json, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `nano-banana-generation-${Date.now()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    showToast('JSON downloaded successfully!', 'success');
-}
-
-// Initialize Launch Mode when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initLaunchMode);
-} else {
-    initLaunchMode();
-}
-
-// Export for testing (if needed)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        state,
-        formatFileSize,
-        copyToClipboard,
-        processFiles
+function categorizeModels(models) {
+    const categories = {
+        textGeneration: [],
+        imageGeneration: [],
+        embedding: [],
+        other: []
     };
+    
+    models.forEach(model => {
+        const name = model.name.toLowerCase();
+        const displayName = (model.displayName || '').toLowerCase();
+        const methods = model.supportedGenerationMethods || [];
+        
+        // Check for embedding models first
+        if (name.includes('embedding') || displayName.includes('embedding')) {
+            categories.embedding.push(model);
+        }
+        // Check for actual image generation models (Imagen series)
+        else if (name.includes('imagen') || displayName.includes('imagen')) {
+            categories.imageGeneration.push(model);
+        }
+        // Most Gemini models (including image-related ones) actually use text generation
+        // They generate text descriptions or use generateContent endpoint
+        else if (methods.includes('generateContent') || 
+                 name.includes('gemini') || 
+                 name.includes('nano') || 
+                 name.includes('banana') || 
+                 name.includes('veo') ||
+                 displayName.includes('nano') || 
+                 displayName.includes('banana') ||
+                 displayName.includes('gemini') ||
+                 displayName.includes('veo') ||
+                 name.includes('image') || 
+                 displayName.includes('image')) {
+            categories.textGeneration.push(model);
+        } 
+        // Fallback for other models
+        else {
+            categories.other.push(model);
+        }
+    });
+    
+    // Log the categorization for debugging
+    console.log('Model categorization results:');
+    console.log('Text Generation models:', categories.textGeneration.map(m => m.displayName || m.name));
+    console.log('Image Generation models:', categories.imageGeneration.map(m => m.displayName || m.name));
+    console.log('Embedding models:', categories.embedding.map(m => m.displayName || m.name));
+    console.log('Other models:', categories.other.map(m => m.displayName || m.name));
+    
+    return categories;
+}
+
+/**
+ * Validate API Key and Check Available Models
+ */
+async function validateApiKey(apiKey) {
+    try {
+        console.log('🔑 Validating API key...');
+        
+        // Use the listModels endpoint to validate the API key
+        const listModelsEndpoint = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+        
+        const response = await axios.get(listModelsEndpoint, {
+            timeout: 10000 // 10 second timeout
+        });
+        
+        const models = response.data.models || [];
+        console.log('✅ API key is valid!');
+        console.log(`Found ${models.length} available models`);
+        
+        // Categorize models by type
+        const categorized = categorizeModels(models);
+        
+        // Check for Nano Banana models specifically
+        const nanoBananaModels = models.filter(model => 
+            model.name.toLowerCase().includes('nano') || 
+            model.name.toLowerCase().includes('banana') ||
+            (model.displayName && (
+                model.displayName.toLowerCase().includes('nano') || 
+                model.displayName.toLowerCase().includes('banana')
+            ))
+        );
+        
+        console.log('Text Generation models:', categorized.textGeneration.length);
+        console.log('Image Generation models:', categorized.imageGeneration.length);
+        console.log('Embedding models:', categorized.embedding.length);
+        
+        if (nanoBananaModels.length > 0) {
+            console.log('🍌 Nano Banana models found:', nanoBananaModels.map(m => m.displayName || m.name));
+        } else {
+            console.log('ℹ️ No Nano Banana models detected');
+        }
+        
+        if (categorized.textGeneration.length === 0 && categorized.imageGeneration.length === 0) {
+            throw new Error('No suitable models found. Your API key may not have access to generation models.');
+        }
+        
+        return {
+            isValid: true,
+            allModels: models,
+            categorizedModels: {
+                ...categorized,
+                allModels: models  // Add all models for the "Show All" option
+            },
+            totalModels: models.length
+        };
+        
+    } catch (error) {
+        console.error('❌ API key validation failed:', error);
+        
+        let errorMessage = 'API key validation failed. ';
+        
+        if (error.response) {
+            const status = error.response.status;
+            const errorData = error.response.data?.error;
+            
+            if (status === 400) {
+                errorMessage += 'Invalid API key format. Please check your key.';
+            } else if (status === 403) {
+                errorMessage += 'API key does not have permission to access models. Please check your Google AI Studio settings.';
+            } else if (status === 401) {
+                errorMessage += 'API key authentication failed. Please verify your key is correct.';
+            } else {
+                errorMessage += `Status: ${status}. ${errorData?.message || ''}`;
+            }
+        } else if (error.request) {
+            errorMessage += 'Network error. Please check your internet connection.';
+        } else {
+            errorMessage += error.message;
+        }
+        
+        return {
+            isValid: false,
+            error: errorMessage
+        };
+    }
+}
+
+/**
+ * Display Gemini Response (Enhanced Prompt)
+ */
+function displayGeminiResponse(generatedText) {
+    const responseSection = document.getElementById('responseSection');
+    const responseContent = document.getElementById('responseContent');
+
+    // Create a nice display for the enhanced prompt
+    responseContent.innerHTML = `
+        <div class="gemini-response">
+            <h4>🎨 Enhanced Image Generation Prompt</h4>
+            <div class="enhanced-prompt">
+                <pre class="prompt-text">${generatedText}</pre>
+            </div>
+            <div class="next-steps">
+                <h4>📋 Next Steps:</h4>
+                <p>Copy the enhanced prompt above and use it with your preferred image generation AI:</p>
+                <ul>
+                    <li><strong>Midjourney:</strong> Paste in Discord with /imagine</li>
+                    <li><strong>DALL-E:</strong> Use in ChatGPT or OpenAI platform</li>
+                    <li><strong>Stable Diffusion:</strong> Use in ComfyUI, Automatic1111, or online tools</li>
+                    <li><strong>Adobe Firefly:</strong> Use in Adobe Creative Suite</li>
+                </ul>
+                <button class="btn-primary copy-prompt-btn" onclick="copyEnhancedPrompt()">
+                    📋 Copy Enhanced Prompt
+                </button>
+            </div>
+        </div>
+    `;
+
+    responseSection.style.display = 'block';
+    responseSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+/**
+ * Copy Enhanced Prompt to Clipboard
+ */
+function copyEnhancedPrompt() {
+    const promptText = document.querySelector('.prompt-text');
+    if (!promptText) {
+        showToast('No prompt text found to copy', 'error');
+        return;
+    }
+    
+    const textContent = promptText.textContent;
+    copyToClipboard(textContent);
+    showToast('Enhanced prompt copied to clipboard!', 'success');
 }
