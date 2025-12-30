@@ -19,10 +19,11 @@ const state = {
     currentImageCount: 0,
     compressionSettings: {
         enabled: true,
-        quality: 0.7,  // 0.0 to 1.0
-        maxWidth: 1024,
-        maxHeight: 1024,
-        convertPngToJpeg: false  // Option to convert PNG to JPEG for better compression
+        quality: 0.6,  // Reduced quality for smaller files
+        maxWidth: 800,  // Reduced max dimensions
+        maxHeight: 800,
+        convertPngToJpeg: true,  // Always convert PNG to JPEG for better compression
+        targetMaxSize: 100000  // Target max size in bytes (100KB)
     }
 };
 
@@ -43,7 +44,9 @@ const elements = {
     qualityValue: null,
     maxDimensionSelect: null,
     settingsContent: null,
-    tokenCost: null
+    tokenCost: null,
+    totalSize: null,
+    targetSize: null
 };
 
 /**
@@ -57,6 +60,13 @@ function init() {
     elements.maxDimensionSelect = document.getElementById('maxDimensionSelect');
     elements.settingsContent = document.getElementById('settingsContent');
     elements.tokenCost = document.getElementById('tokenCost');
+    elements.totalSize = document.getElementById('totalSize');
+    elements.targetSize = document.getElementById('targetSize');
+    
+    // Set target size display
+    if (elements.targetSize) {
+        elements.targetSize.textContent = formatFileSize(state.compressionSettings.targetMaxSize);
+    }
     
     setupEventListeners();
     setupCompressionSettings();
@@ -95,21 +105,39 @@ function setupCompressionSettings() {
 }
 
 /**
- * Update Token Cost Estimate
+ * Update Token Cost and Size Estimates
  */
 function updateTokenCostEstimate() {
     if (!elements.tokenCost) return;
     
     if (state.images.length === 0) {
         elements.tokenCost.textContent = '~$0.00';
+        if (elements.totalSize) {
+            elements.totalSize.textContent = '0 B';
+        }
         return;
     }
     
     // Calculate total Base64 size
     let totalBase64Length = 0;
+    let totalByteSize = 0;
     state.images.forEach(img => {
         totalBase64Length += img.base64.length;
+        totalByteSize += Math.round((img.base64.length * 3) / 4);
     });
+    
+    // Update total size display
+    if (elements.totalSize) {
+        elements.totalSize.textContent = formatFileSize(totalByteSize);
+        
+        // Add warning color if over target per image
+        const averageSizePerImage = totalByteSize / state.images.length;
+        if (averageSizePerImage > state.compressionSettings.targetMaxSize) {
+            elements.totalSize.style.color = '#ff9800';
+        } else {
+            elements.totalSize.style.color = 'var(--primary-color)';
+        }
+    }
     
     // Estimate tokens using configurable ratio
     const estimatedTokens = Math.ceil(totalBase64Length / CONFIG.CHARS_PER_TOKEN);
@@ -227,6 +255,13 @@ function processFiles(files) {
  * Process Single Image
  */
 function processImage(file) {
+    // Check file size before processing
+    const maxFileSize = 50 * 1024 * 1024; // 50MB limit for input files
+    if (file.size > maxFileSize) {
+        showToast(`File too large: ${file.name} (${formatFileSize(file.size)}). Maximum input size is 50MB.`, 'error');
+        return;
+    }
+    
     const reader = new FileReader();
     
     reader.onload = async (e) => {
@@ -236,6 +271,11 @@ function processImage(file) {
                 const compressedData = await compressImage(e.target.result, file.type);
                 const originalSize = file.size;
                 const compressedSize = Math.round((compressedData.length * 3) / 4); // Approximate Base64 to bytes
+                
+                // Final size check after compression
+                if (compressedSize > state.compressionSettings.targetMaxSize) {
+                    showToast(`Warning: ${file.name} compressed to ${formatFileSize(compressedSize)} (target: ${formatFileSize(state.compressionSettings.targetMaxSize)}). This may cause quota issues.`, 'warning');
+                }
                 
                 const imageData = {
                     id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
@@ -253,10 +293,14 @@ function processImage(file) {
                 updateTokenCostEstimate();
             } catch (error) {
                 console.error('Compression failed:', error);
-                showToast('Compression failed for: ' + file.name, 'error');
+                showToast(`Compression failed for: ${file.name}. Please try a smaller image.`, 'error');
             }
         } else {
-            // No compression
+            // No compression - warn about large files
+            if (file.size > state.compressionSettings.targetMaxSize) {
+                showToast(`Warning: ${file.name} is ${formatFileSize(file.size)}. Enable compression to reduce size and avoid quota issues.`, 'warning');
+            }
+            
             const imageData = {
                 id: Date.now() + '_' + Math.random().toString(36).substr(2, 9),
                 name: file.name,
@@ -282,7 +326,7 @@ function processImage(file) {
 }
 
 /**
- * Compress Image using Canvas
+ * Compress Image using Canvas with aggressive compression to stay under 100KB
  */
 async function compressImage(dataURL, mimeType) {
     return new Promise((resolve, reject) => {
@@ -292,37 +336,81 @@ async function compressImage(dataURL, mimeType) {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             
-            // Calculate new dimensions while maintaining aspect ratio
+            // Start with more aggressive dimensions to ensure smaller file size
             let width = img.width;
             let height = img.height;
-            const maxWidth = state.compressionSettings.maxWidth;
-            const maxHeight = state.compressionSettings.maxHeight;
+            let maxWidth = state.compressionSettings.maxWidth;
+            let maxHeight = state.compressionSettings.maxHeight;
             
+            // First pass: resize to max dimensions
             if (width > maxWidth || height > maxHeight) {
                 const ratio = Math.min(maxWidth / width, maxHeight / height);
                 width = Math.round(width * ratio);
                 height = Math.round(height * ratio);
             }
             
-            canvas.width = width;
-            canvas.height = height;
+            // Helper function to get file size from data URL
+            const getDataURLSize = (dataURL) => {
+                const base64 = dataURL.split(',')[1];
+                return Math.round((base64.length * 3) / 4);
+            };
             
-            // Draw image on canvas with high quality
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(img, 0, 0, width, height);
+            // Helper function to compress with specific quality and dimensions
+            const compressWithSettings = (w, h, quality) => {
+                canvas.width = w;
+                canvas.height = h;
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(img, 0, 0, w, h);
+                
+                // Always use JPEG for better compression
+                return canvas.toDataURL('image/jpeg', quality);
+            };
             
-            // Convert to Base64 with specified quality
-            // For JPEG/WebP, quality matters. PNG ignores quality parameter.
-            const quality = state.compressionSettings.quality;
-            let outputMimeType = mimeType;
+            let quality = state.compressionSettings.quality;
+            let currentWidth = width;
+            let currentHeight = height;
+            let compressedDataURL = compressWithSettings(currentWidth, currentHeight, quality);
+            let currentSize = getDataURLSize(compressedDataURL);
             
-            // Convert PNG to JPEG for better compression if enabled
-            if (mimeType === 'image/png' && state.compressionSettings.convertPngToJpeg) {
-                outputMimeType = 'image/jpeg';
+            // If still too large, iteratively reduce quality and/or dimensions
+            const targetSize = state.compressionSettings.targetMaxSize;
+            let attempts = 0;
+            const maxAttempts = 10;
+            
+            while (currentSize > targetSize && attempts < maxAttempts) {
+                attempts++;
+                
+                if (attempts % 2 === 1) {
+                    // Odd attempts: reduce quality
+                    quality = Math.max(0.1, quality - 0.1);
+                } else {
+                    // Even attempts: reduce dimensions
+                    const reductionFactor = 0.9;
+                    currentWidth = Math.round(currentWidth * reductionFactor);
+                    currentHeight = Math.round(currentHeight * reductionFactor);
+                    
+                    // Don't go below minimum reasonable dimensions
+                    if (currentWidth < 100 || currentHeight < 100) {
+                        currentWidth = Math.max(100, currentWidth);
+                        currentHeight = Math.max(100, currentHeight);
+                        quality = Math.max(0.1, quality - 0.1);
+                    }
+                }
+                
+                compressedDataURL = compressWithSettings(currentWidth, currentHeight, quality);
+                currentSize = getDataURLSize(compressedDataURL);
             }
             
-            const compressedDataURL = canvas.toDataURL(outputMimeType, quality);
+            // Final check - if still too large, use minimum settings
+            if (currentSize > targetSize) {
+                compressedDataURL = compressWithSettings(
+                    Math.min(400, currentWidth), 
+                    Math.min(400, currentHeight), 
+                    0.1
+                );
+            }
+            
             resolve(compressedDataURL);
         };
         
@@ -421,14 +509,18 @@ function showToast(message, type = 'success') {
     } else if (type === 'error') {
         icon.textContent = '❌';
         elements.toast.style.background = 'linear-gradient(135deg, #f44336, #d32f2f)';
+    } else if (type === 'warning') {
+        icon.textContent = '⚠️';
+        elements.toast.style.background = 'linear-gradient(135deg, #ff9800, #f57c00)';
     }
     
     elements.toast.classList.add('show');
     
-    // Hide toast after 3 seconds
+    // Hide toast after 3 seconds (longer for warnings)
+    const duration = type === 'warning' ? 5000 : 3000;
     setTimeout(() => {
         elements.toast.classList.remove('show');
-    }, 3000);
+    }, duration);
 }
 
 /**
@@ -476,6 +568,7 @@ function clearGallery() {
     state.images = [];
     elements.gallery.innerHTML = '';
     updateEmptyState();
+    updateTokenCostEstimate();
     showToast('Gallery cleared', 'success');
 }
 

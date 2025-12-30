@@ -361,17 +361,28 @@ body {
     display: flex;
     align-items: center;
     gap: 12px;
+    margin-bottom: 10px;
 }
 
-.cost-icon {
+.size-summary {
+    background: rgba(33, 150, 243, 0.1);
+    border: 1px solid rgba(33, 150, 243, 0.3);
+    border-radius: 10px;
+    padding: 15px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.cost-icon, .size-icon {
     font-size: 1.5rem;
 }
 
-.cost-text {
+.cost-text, .size-text {
     font-size: 1rem;
 }
 
-.cost-text strong {
+.cost-text strong, .size-text strong {
     color: var(--primary-color);
     font-size: 1.1rem;
 }
