@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Professional AI Image Generation Platform - Upload references, craft prompts, generate stunning images">
+    <meta name="keywords" content="AI image generation, prompt engineering, image creation, AI art, Gemini">
+    <meta name="author" content="NanoBanana Team">
+    <title>🍌 Banana - AI Image Generation Platform</title>
+    <link rel="stylesheet" href="banana.css">
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.2/dist/axios.min.js"></script>
+</head>
+<body>
+    <!-- Background Gradient -->
+    <div class="gradient-bg"></div>
+    
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1 class="title">
+                <span class="banana-icon">🍌</span>
+                Banana
+            </h1>
+            <p class="subtitle">Professional AI Image Generation Platform</p>
+            <p class="tagline">Upload • Prompt • Generate • Download</p>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            
+            <!-- Step 1: Image Upload -->
+            <section class="card upload-card">
+                <div class="card-header">
+                    <h2><span class="step-number">1</span> Upload Reference Images</h2>
+                    <p class="card-subtitle">Add images for style, composition, or identity reference</p>
+                </div>
+                
+                <div class="drop-zone" id="dropZone">
+                    <div class="drop-zone-content">
+                        <div class="upload-icon">🖼️</div>
+                        <h3 class="drop-zone-title">Drag & Drop Images Here</h3>
+                        <p class="drop-zone-subtitle">or</p>
+                        <label for="fileInput" class="file-input-label">
+                            Browse Files
+                        </label>
+                        <input 
+                            type="file" 
+                            id="fileInput" 
+                            class="file-input" 
+                            accept="image/*" 
+                            multiple
+                        >
+                        <p class="drop-zone-hint">JPG, PNG, GIF, WebP • Multiple files supported</p>
+                    </div>
+                </div>
+
+                <!-- Image Gallery -->
+                <div class="reference-gallery" id="referenceGallery">
+                    <!-- Images will be added dynamically -->
+                </div>
+            </section>
+
+            <!-- Step 2: Prompt Engineering -->
+            <section class="card prompt-card">
+                <div class="card-header">
+                    <h2><span class="step-number">2</span> Craft Your Prompt</h2>
+                    <p class="card-subtitle">Describe what you want to generate</p>
+                </div>
+
+                <div class="prompt-grid">
+                    <div class="prompt-section positive-prompt">
+                        <label for="positivePrompt">
+                            <span class="label-icon">✨</span>
+                            What You Want
+                        </label>
+                        <textarea 
+                            id="positivePrompt" 
+                            class="prompt-textarea" 
+                            rows="6"
+                            placeholder="Example: A cinematic portrait of a confident woman in professional attire, soft studio lighting, neutral background, high-end editorial style, photorealistic..."
+                        ></textarea>
+                    </div>
+
+                    <div class="prompt-section negative-prompt">
+                        <label for="negativePrompt">
+                            <span class="label-icon">🚫</span>
+                            What You Don't Want
+                        </label>
+                        <textarea 
+                            id="negativePrompt" 
+                            class="prompt-textarea" 
+                            rows="6"
+                            placeholder="Example: cartoon, anime, illustration, low quality, blurry, distorted, oversaturated colors, cluttered background..."
+                        ></textarea>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 3: Generation Parameters -->
+            <section class="card params-card">
+                <div class="card-header">
+                    <h2><span class="step-number">3</span> Configure Parameters</h2>
+                    <p class="card-subtitle">Fine-tune your generation settings</p>
+                </div>
+
+                <div class="params-tabs">
+                    <button class="param-tab active" data-tab="basic">Basic</button>
+                    <button class="param-tab" data-tab="style">Style</button>
+                    <button class="param-tab" data-tab="advanced">Advanced</button>
+                </div>
+
+                <!-- Basic Tab -->
+                <div class="params-content active" id="basic-tab">
+                    <div class="params-grid">
+                        <div class="param-group">
+                            <label>
+                                <span class="param-icon">📐</span>
+                                Aspect Ratio
+                            </label>
+                            <select id="aspectRatio" class="param-select">
+                                <option value="9:16">9:16 - Vertical (Reels/Stories)</option>
+                                <option value="1:1">1:1 - Square (Instagram Post)</option>
+                                <option value="16:9">16:9 - Horizontal (YouTube)</option>
+                                <option value="4:5">4:5 - Portrait (Instagram)</option>
+                                <option value="3:2">3:2 - Classic Photo</option>
+                            </select>
+                        </div>
+
+                        <div class="param-group">
+                            <label>
+                                <span class="param-icon">🎨</span>
+                                Style Preset
+                            </label>
+                            <select id="stylePreset" class="param-select">
+                                <option value="photorealistic">Photorealistic</option>
+                                <option value="cinematic">Cinematic</option>
+                                <option value="artistic">Artistic</option>
+                                <option value="editorial">Editorial</option>
+                                <option value="commercial">Commercial</option>
+                                <option value="fashion">Fashion</option>
+                            </select>
+                        </div>
+
+                        <div class="param-group">
+                            <label>
+                                <span class="param-icon">⚡</span>
+                                Quality
+                            </label>
+                            <select id="quality" class="param-select">
+                                <option value="standard">Standard</option>
+                                <option value="high" selected>High</option>
+                                <option value="ultra">Ultra (Slower)</option>
+                            </select>
+                        </div>
+
+                        <div class="param-group">
+                            <label>
+                                <span class="param-icon">📏</span>
+                                Output Size
+                            </label>
+                            <select id="outputSize" class="param-select">
+                                <option value="1024">1024px</option>
+                                <option value="1536">1536px</option>
+                                <option value="2048" selected>2048px</option>
+                                <option value="2560">2560px</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Style Tab -->
+                <div class="params-content" id="style-tab">
+                    <div class="params-grid">
+                        <div class="param-group">
+                            <label>
+                                <span class="param-icon">💡</span>
+                                Lighting
+                            </label>
+                            <select id="lighting" class="param-select">
+                                <option value="natural">Natural Light</option>
+                                <option value="studio" selected>Studio</option>
+                                <option value="golden">Golden Hour</option>
+                                <option value="dramatic">Dramatic</option>
+                                <option value="soft">Soft & Diffused</option>
+                            </select>
+                        </div>
+
+                        <div class="param-group">
+                            <label>
+                                <span class="param-icon">🎭</span>
+                                Mood
+                            </label>
+                            <select id="mood" class="param-select">
+                                <option value="professional">Professional</option>
+                                <option value="vibrant">Vibrant & Energetic</option>
+                                <option value="calm">Calm & Serene</option>
+                                <option value="dramatic">Dramatic & Intense</option>
+                                <option value="warm">Warm & Inviting</option>
+                            </select>
+                        </div>
+
+                        <div class="param-group">
+                            <label>
+                                <span class="param-icon">🌈</span>
+                                Color Palette
+                            </label>
+                            <select id="colorPalette" class="param-select">
+                                <option value="natural">Natural Colors</option>
+                                <option value="muted">Muted & Desaturated</option>
+                                <option value="vibrant">Vibrant & Saturated</option>
+                                <option value="monochrome">Monochrome</option>
+                                <option value="pastel">Pastel Tones</option>
+                            </select>
+                        </div>
+
+                        <div class="param-group">
+                            <label>
+                                <span class="param-icon">📸</span>
+                                Camera Angle
+                            </label>
+                            <select id="cameraAngle" class="param-select">
+                                <option value="eye-level">Eye Level</option>
+                                <option value="low">Low Angle</option>
+                                <option value="high">High Angle</option>
+                                <option value="overhead">Overhead</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Advanced Tab -->
+                <div class="params-content" id="advanced-tab">
+                    <div class="params-grid">
+                        <div class="param-group">
+                            <label>
+                                <span class="param-icon">🔧</span>
+                                Creativity
+                            </label>
+                            <input type="range" id="creativity" min="0" max="100" value="70" class="param-slider">
+                            <div class="slider-labels">
+                                <span>Conservative</span>
+                                <span id="creativityValue">70%</span>
+                                <span>Creative</span>
+                            </div>
+                        </div>
+
+                        <div class="param-group">
+                            <label>
+                                <span class="param-icon">🎯</span>
+                                Reference Strength
+                            </label>
+                            <input type="range" id="refStrength" min="0" max="100" value="80" class="param-slider">
+                            <div class="slider-labels">
+                                <span>Loose</span>
+                                <span id="refStrengthValue">80%</span>
+                                <span>Strict</span>
+                            </div>
+                        </div>
+
+                        <div class="param-group">
+                            <label>
+                                <span class="param-icon">🌟</span>
+                                Seed (Reproducibility)
+                            </label>
+                            <input type="number" id="seed" class="param-input" placeholder="Random (leave empty)">
+                        </div>
+
+                        <div class="param-group">
+                            <label>
+                                <span class="param-icon">🔄</span>
+                                Number of Variations
+                            </label>
+                            <select id="variations" class="param-select">
+                                <option value="1" selected>1 Image</option>
+                                <option value="2">2 Variations</option>
+                                <option value="4">4 Variations</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 4: API Configuration & Generation -->
+            <section class="card generate-card">
+                <div class="card-header">
+                    <h2><span class="step-number">4</span> Generate Your Image</h2>
+                    <p class="card-subtitle">Configure API and start generation</p>
+                </div>
+
+                <div class="api-config">
+                    <div class="api-input-group">
+                        <label for="apiKey">
+                            <span class="label-icon">🔑</span>
+                            API Key
+                            <a href="https://aistudio.google.com/app/apikey" target="_blank" class="get-key-link">Get Free Key</a>
+                        </label>
+                        <input 
+                            type="password" 
+                            id="apiKey" 
+                            class="api-input" 
+                            placeholder="Enter your Gemini API key..."
+                        >
+                    </div>
+
+                    <div class="api-input-group">
+                        <label for="modelSelect">
+                            <span class="label-icon">🤖</span>
+                            AI Model
+                        </label>
+                        <select id="modelSelect" class="api-input">
+                            <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Experimental)</option>
+                            <option value="gemini-1.5-flash" selected>Gemini 1.5 Flash (Recommended)</option>
+                            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="generation-actions">
+                    <button class="btn-generate" id="generateBtn">
+                        <span class="btn-icon">🚀</span>
+                        Generate Image
+                    </button>
+                    <button class="btn-secondary" id="enhancePromptBtn">
+                        <span class="btn-icon">✨</span>
+                        Enhance Prompt with AI
+                    </button>
+                </div>
+
+                <!-- Cost Estimate -->
+                <div class="cost-info">
+                    <span class="cost-icon">💰</span>
+                    <span class="cost-text">Estimated cost: <strong id="costEstimate">~$0.00</strong></span>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="card results-card" id="resultsCard" style="display: none;">
+                <div class="card-header">
+                    <h2><span class="step-icon">✨</span> Generated Results</h2>
+                    <button class="btn-clear" id="clearResultsBtn">Clear</button>
+                </div>
+
+                <div class="results-content" id="resultsContent">
+                    <!-- Generated images and prompts will appear here -->
+                </div>
+            </section>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Made with 🍌 by the NanoBanana Team | 
+                <a href="https://github.com/loker-global/NanoBanana-Base64" target="_blank" rel="noopener">
+                    GitHub
+                </a> | 
+                <a href="index.html">Base64 Converter</a>
+            </p>
+            <p class="privacy-note">🔒 All processing happens securely. Your API key is never stored.</p>
+        </footer>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+        <span class="toast-icon">✅</span>
+        <span class="toast-message" id="toastMessage">Success!</span>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <p class="loading-text" id="loadingText">Processing...</p>
+    </div>
+
+    <script src="banana.js"></script>
+</body>
+</html>

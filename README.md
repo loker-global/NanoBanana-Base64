@@ -2,7 +2,7 @@
 
 > **Transform images into Base64 strings with style** — A stunning, award-winning web application for converting images to Base64 encoding with a single click.
 
-![Version](https://img.shields.io/badge/version-1.0.0-yellow.svg)
+![Version](https://img.shields.io/badge/version-2.0.0-yellow.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![HTML5](https://img.shields.io/badge/HTML5-E34F26?logo=html5&logoColor=white)
 ![CSS3](https://img.shields.io/badge/CSS3-1572B6?logo=css3&logoColor=white)
@@ -10,17 +10,108 @@
 
 ---
 
-## 📋 Product Requirements Document (PRD)
+## 🎨 The Banana Manifesto
+
+### A New Era of AI Image Generation
+
+We believe that creating stunning AI-generated images should be as natural as having a conversation. **Banana** represents our vision for the future of creative technology—where professional tools are accessible to everyone, where complexity is hidden behind elegance, and where the barrier between imagination and creation disappears.
+
+### Our Philosophy
+
+**🍌 Banana** is not just an AI image generation platform. It's a statement about how creative tools should work in the modern era:
+
+1. **Professional-Grade UX for Everyone**  
+   High-end tools don't have to be complicated. We've distilled enterprise-level AI image generation into an interface so intuitive, it feels like second nature.
+
+2. **Prompt Engineering Made Simple**  
+   Your ideas matter more than technical jargon. Banana helps you craft perfect prompts without needing to be a prompt engineering expert.
+
+3. **Reference-Based Creation**  
+   Upload your vision. Mix styles. Blend compositions. Create something entirely new by building on what inspires you.
+
+4. **Transparent & Secure**  
+   Your creativity, your data, your control. Everything happens in your browser. Your API keys stay with you. No tracking, no compromises.
+
+5. **Built for Speed**  
+   Generate ideas faster than ever. Enhance prompts with AI. Iterate in seconds. Download and share instantly.
+
+### Why Banana?
+
+Because creating should be fun 🍌. Because professional tools should be accessible. Because AI is at its best when it amplifies human creativity, not replaces it.
+
+**Banana** is our love letter to creators, dreamers, and makers who refuse to compromise between power and simplicity.
+
+---
+
+## 🚀 Two Powerful Tools, One Platform
+
+### [index.html](index.html) - Base64 Converter
+The foundation. Convert images to Base64 with smart compression, perfect for API workflows and development.
+
+### [banana.html](banana.html) - AI Image Generation Platform ⭐ NEW
+The revolution. Professional AI image generation with:
+- **Multi-Image Reference Upload** - Blend styles and compositions
+- **Intelligent Prompt Engineering** - Separate "what you want" from "what you don't want"
+- **Advanced Parameter Control** - Fine-tune every aspect across Basic, Style, and Advanced tabs
+- **AI-Powered Prompt Enhancement** - Let AI improve your prompts automatically
+- **Direct Image Generation** - From idea to image in seconds
+- **Professional Results** - Download-ready, high-quality outputs
+
+---
+
+## 🌟 Banana - The Ultimate AI Image Generation Experience
+
+### What Makes Banana Different?
+
+**Banana** represents a quantum leap in AI image generation UX. Built from the ground up with one goal: make professional AI image generation accessible to everyone without sacrificing power or control.
+
+#### 🎯 The Four-Step Revolution
+
+1. **Upload** - Drag & drop your reference images. Mix photography, art, anything that inspires you.
+2. **Prompt** - Describe your vision in natural language. Separate what you want from what you don't.
+3. **Configure** - Fine-tune with professional parameters across Basic, Style, and Advanced tabs.
+4. **Generate** - One click. One moment. One perfect result.
+
+#### ⚡ Key Features
+
+- **🖼️ Multi-Reference System**: Upload multiple images as style, composition, or identity references
+- **✨ Dual Prompt Interface**: Separate positive and negative prompts for precision control
+- **🎨 Three-Tier Parameters**:
+  - **Basic**: Aspect ratio, style preset, quality, output size
+  - **Style**: Lighting, mood, color palette, camera angle
+  - **Advanced**: Creativity slider, reference strength, seed control, variations
+- **🤖 AI-Powered Enhancement**: Let Gemini optimize your prompts automatically
+- **🔑 Flexible API Support**: Works with any Gemini model
+- **💰 Cost Transparency**: Real-time generation cost estimates
+- **⚡ Keyboard Shortcuts**: 
+  - `Ctrl/Cmd + Enter` - Generate
+  - `Ctrl/Cmd + E` - Enhance Prompt
+  - `Ctrl/Cmd + O` - Upload Images
+
+#### 🎨 Professional Style Presets
+
+- Photorealistic
+- Cinematic
+- Artistic
+- Editorial
+- Commercial
+- Fashion
+
+#### 📐 Smart Aspect Ratios
+
+- 9:16 - Vertical (Instagram Reels, TikTok)
+- 1:1 - Square (Instagram Posts)
+- 16:9 - Horizontal (YouTube, Presentations)
+- 4:5 - Portrait (Instagram Feed)
+- 3:2 - Classic Photo
+
+---
+
+## 📋 Base64 Converter - The Foundation
 
 ### 🎯 Product Overview
 
 **NanoBanana-Base64** is a modern, web-based image-to-Base64 converter designed to provide developers, designers, and content creators with a seamless way to convert images into Base64-encoded strings. Perfect for embedding images in JSON, CSS, or HTML without external file dependencies.
-
-### 🚀 Vision Statement
-
-To create the most intuitive, beautiful, and efficient image-to-Base64 converter that makes working with encoded images a delightful experience.
-
----
 
 ### 👥 Target Audience
 
@@ -220,10 +311,11 @@ To create the most intuitive, beautiful, and efficient image-to-Base64 converter
 
 ---
 
-### 🚀 Future Enhancements (v2.0+)
+### 🚀 Future Enhancements
 
 - [ ] Base64 to image conversion (reverse operation)
 - [x] ~~Image compression before encoding~~ ✅ **DONE in v1.0**
+- [x] ~~AI Image Generation Platform~~ ✅ **DONE in v2.0 - Banana**
 - [ ] Custom output format (data URI, raw Base64, etc.)
 - [ ] Batch download as JSON file
 - [ ] History of conversions (session storage)
@@ -239,22 +331,93 @@ To create the most intuitive, beautiful, and efficient image-to-Base64 converter
 
 ### Installation
 
-No installation required! This is a pure HTML/CSS/JavaScript application.
+No installation required! These are pure HTML/CSS/JavaScript applications.
 
-### Usage
+### Quick Start
 
 #### Option 1: Open Locally
 1. Clone this repository:
    ```bash
    git clone https://github.com/loker-global/NanoBanana-Base64.git
+   cd NanoBanana-Base64
    ```
-2. Open `index.html` in your web browser
-3. Start converting images!
+2. Open either:
+   - `index.html` - For Base64 conversion
+   - `banana.html` - For AI image generation ⭐
+3. Start creating!
 
-#### Option 2: Use Online (coming soon)
-Visit the hosted version at `https://loker-global.github.io/NanoBanana-Base64`
+#### Option 2: Use Online
+Visit the hosted versions:
+- Base64 Converter: `https://loker-global.github.io/NanoBanana-Base64/`
+- Banana AI: `https://loker-global.github.io/NanoBanana-Base64/banana.html`
 
-### How to Use
+---
+
+## 🎓 How to Use Banana
+
+### Step 1: Get Your Free API Key
+1. Visit [Google AI Studio](https://aistudio.google.com/app/apikey)
+2. Sign in with your Google account
+3. Create a new API key (it's free!)
+4. Copy your API key
+
+### Step 2: Upload Reference Images (Optional)
+- Drag & drop or click to browse
+- Upload multiple images for style/composition reference
+- Remove any image by clicking the × button
+
+### Step 3: Craft Your Prompt
+- **What You Want**: Describe your ideal image in detail
+- **What You Don't Want**: List elements to avoid (optional)
+
+Example:
+```
+What You Want:
+A cinematic portrait of a confident woman in professional attire, 
+soft studio lighting, neutral background, high-end editorial style, 
+photorealistic, sharp focus, elegant composition
+
+What You Don't Want:
+cartoon, anime, illustration, low quality, blurry, distorted, 
+oversaturated colors, cluttered background
+```
+
+### Step 4: Configure Parameters
+
+#### Basic Tab
+- **Aspect Ratio**: Choose your output format (9:16, 1:1, 16:9, etc.)
+- **Style Preset**: Select from Photorealistic, Cinematic, Artistic, Editorial, Commercial, Fashion
+- **Quality**: Standard, High, or Ultra
+- **Output Size**: 1024px to 2560px
+
+#### Style Tab
+- **Lighting**: Natural, Studio, Golden Hour, Dramatic, Soft
+- **Mood**: Professional, Vibrant, Calm, Dramatic, Warm
+- **Color Palette**: Natural, Muted, Vibrant, Monochrome, Pastel
+- **Camera Angle**: Eye Level, Low, High, Overhead
+
+#### Advanced Tab
+- **Creativity**: Slide from Conservative to Creative (0-100%)
+- **Reference Strength**: How closely to follow reference images (0-100%)
+- **Seed**: For reproducible results (optional)
+- **Variations**: Generate 1, 2, or 4 variations
+
+### Step 5: Generate!
+1. Enter your API key in the field
+2. Choose your Gemini model (1.5 Flash recommended)
+3. Click **🚀 Generate Image** or press `Ctrl/Cmd + Enter`
+4. Wait for the AI to create your image
+5. Download and enjoy!
+
+### Pro Tips
+- Use **✨ Enhance Prompt with AI** to automatically improve your prompts
+- Reference images dramatically improve results for specific styles
+- Higher creativity values = more artistic interpretation
+- Save your API key locally (it's never sent to our servers)
+
+---
+
+## 🎨 How to Use Base64 Converter
 
 1. **Upload Images**:
    - Drag and drop images onto the drop zone, OR
@@ -278,10 +441,13 @@ Visit the hosted version at `https://loker-global.github.io/NanoBanana-Base64`
 
 ```
 NanoBanana-Base64/
-├── index.html          # Main HTML structure
-├── styles.css          # Styling and animations
-├── app.js              # Core JavaScript functionality
-├── README.md           # This file (includes PRD)
+├── index.html          # Base64 Converter - Main interface
+├── styles.css          # Base64 Converter - Styling
+├── app.js              # Base64 Converter - Core functionality
+├── banana.html         # 🍌 AI Image Generation Platform
+├── banana.css          # 🍌 Banana - Professional styling
+├── banana.js           # 🍌 Banana - AI integration & logic
+├── README.md           # Documentation & Manifesto
 ├── LICENSE             # MIT License
 └── .gitignore          # Git ignore rules
 ```
@@ -290,10 +456,29 @@ NanoBanana-Base64/
 
 ## 🛠️ Technology Stack
 
-- **HTML5**: Semantic markup and structure
-- **CSS3**: Modern styling with custom properties, grid, flexbox
-- **Vanilla JavaScript**: Pure ES6+ JavaScript, no frameworks
-- **Web APIs**: FileReader, Clipboard, Drag & Drop
+### Core Technologies
+- **HTML5**: Semantic markup and modern structure
+- **CSS3**: 
+  - Custom properties (CSS variables)
+  - Grid & Flexbox layouts
+  - Glassmorphism effects
+  - Smooth animations & transitions
+  - Responsive design
+- **Vanilla JavaScript**: Pure ES6+ JavaScript, zero dependencies
+- **Web APIs**: 
+  - FileReader API (image processing)
+  - Clipboard API (copy functionality)
+  - Drag & Drop API (file uploads)
+  - LocalStorage API (settings persistence)
+
+### External Libraries
+- **Axios**: HTTP client for API requests (Banana only)
+
+### AI Integration (Banana)
+- **Google Gemini API**: 
+  - Text generation (prompt enhancement)
+  - Multimodal capabilities (image + text)
+  - Multiple model support (Flash, Pro, Experimental)
 
 ---
 
